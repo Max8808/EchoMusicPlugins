@@ -51,7 +51,7 @@ https://github.com/hoowhoami/EchoMusicPlugins
 
 ## 插件开发文档
 
-EchoMusic 支持本地插件。插件由用户主动放入插件目录并在"插件管理"中启用，定位接近 VS Code / Obsidian 的高自由度本地扩展：插件可以注册 UI、监听播放器状态、访问 Pinia store、注入 CSS、调用受控的播放器/队列/存储 API，也可以通过 selector 把 Vue 组件挂到主界面的任意 DOM 位置。
+EchoMusic 支持在线插件源和本地插件。用户可以在"插件管理"中添加 GitHub 插件源并在线安装，也可以手动将插件目录放入本地插件目录后启用。插件定位接近 VS Code / Obsidian 的高自由度本地扩展：插件可以注册 UI、监听播放器状态、访问 Pinia store、注入 CSS、调用受控的播放器/队列/存储 API，也可以通过 selector 把 Vue 组件挂到主界面的任意 DOM 位置。
 
 扩展文档：
 
