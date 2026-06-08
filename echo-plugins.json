@@ -35,7 +35,7 @@
     {
       "id": "spectrum-visualizer",
       "name": "频谱可视化",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "在播放栏、mini 播放器和歌词页底部控制区显示跟随音频变化的频谱背景。",
       "author": "EchoMusic",
       "icon": "icon.svg",
@@ -44,7 +44,7 @@
       "homepage": "https://github.com/hoowhoami/EchoMusicPlugins/tree/main/spectrum-visualizer",
       "tags": ["audio", "spectrum", "player-bar", "mini-player", "lyrics"],
       "requires": {
-        "echoMusicVersion": ">=2.2.6-beta.11"
+        "echoMusicVersion": ">=2.2.6-beta.12"
       }
     }
   ]
