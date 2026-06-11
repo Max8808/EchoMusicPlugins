@@ -88,6 +88,15 @@ EchoMusicPlugins/
 
 ## 更新日志
 
+### v1.1.0
+
+- 新增多 WebDAV 库支持：可在设置中添加多个 WebDAV 服务器，每个库独立配置
+- 浏览页面新增库标签页，点击切换不同库，歌曲数量显示在标签页角标上
+- 设置页面新增库管理：支持添加、删除、展开/折叠库配置
+- 浏览页面新增搜索框和定位按钮（UI 占位，功能待开发）
+- 浏览页面新增批量操作按钮（UI 占位，功能待开发）
+- 代码重构：提取 `buildPatchFromSource` 和 `detectAudioQuality` 统一逻辑
+
 ### v1.0.6
 
 - 代码重构：提取 `buildPatchFromSource` 统一内嵌标签和酷狗 API 的 patch 构建逻辑
