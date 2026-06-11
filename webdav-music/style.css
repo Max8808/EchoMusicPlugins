@@ -8,119 +8,18 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0 16px;
   overflow: hidden;
   color: var(--color-text-main);
-}
-
-/* ---- Toolbar ---- */
-.webdav-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-  padding: 10px 0;
-  gap: 8px;
-}
-
-.webdav-toolbar-left,
-.webdav-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.webdav-count {
-  font-size: 13px;
-  color: var(--color-text-subtle);
-  white-space: nowrap;
-}
-
-/* ---- Buttons ---- */
-.webdav-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border-light);
-  background: var(--color-bg-elevated);
-  color: var(--color-text-main);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.webdav-btn:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-border);
-}
-
-.webdav-btn:active {
-  transform: scale(0.97);
-}
-
-.webdav-btn-icon {
-  padding: 6px;
-  border: 1px solid transparent;
-  background: transparent;
-}
-
-.webdav-btn-icon:hover {
-  background: var(--color-bg-hover);
-}
-
-.webdav-btn-primary {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-}
-
-.webdav-btn-primary:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-bg-main);
 }
 
 /* ---- Breadcrumb ---- */
-.webdav-breadcrumb {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-  flex-shrink: 0;
-  padding: 2px 0 8px;
-  font-size: 13px;
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 2px;
-}
-
-.webdav-breadcrumb-item {
-  background: none;
-  border: none;
-  color: var(--color-text-subtle);
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 13px;
-  transition: color 0.15s, background 0.15s;
-}
-
 .webdav-breadcrumb-item:hover {
-  color: var(--color-text-main);
   background: var(--color-bg-hover);
-}
-
-.webdav-breadcrumb-item:last-child {
-  color: var(--color-text-main);
-  font-weight: 600;
 }
 
 .webdav-breadcrumb-sep {
   color: var(--color-text-disabled);
-  margin: 0 2px;
   user-select: none;
 }
 
@@ -156,18 +55,17 @@
   grid-template-columns: 40px minmax(0, 1fr) 80px;
   align-items: center;
   height: 44px;
-  padding: 0 8px;
-  margin-bottom: 2px;
+  padding: 0 24px;
   font-size: 12px;
   font-weight: 700;
   color: var(--color-text-main);
   opacity: 0.8;
-  border-bottom: 1px solid var(--color-border-light, var(--border-subtle));
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .webdav-list-header > div {
-  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -198,18 +96,17 @@
 
 .webdav-list-header .webdav-col-song {
   min-width: 0;
-  padding-left: 58px; /* 46px 封面 + 12px gap，使"歌曲"对齐歌曲名而非封面 */
+  padding-left: 58px;
 }
 
 .webdav-list-header .webdav-col-size {
   padding-left: 8px;
 }
 
-/* ---- Song Row (仿 song-list-row) ---- */
+/* ---- Song Row (仿 SongCard) ---- */
 .webdav-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
 .webdav-row {
@@ -217,19 +114,19 @@
   grid-template-columns: 40px minmax(0, 1fr) 80px;
   align-items: center;
   height: 56px;
-  padding: 0 8px;
-  border-radius: 10px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: background 0.12s ease;
   user-select: none;
 }
 
 .webdav-row:hover {
-  background: var(--color-bg-hover, rgba(128, 128, 128, 0.08));
+  background: var(--bg-info-card, rgba(128, 128, 128, 0.06));
 }
 
 .webdav-row.is-active {
-  background: var(--color-bg-hover, rgba(128, 128, 128, 0.12));
+  background: var(--color-bg-hover, rgba(128, 128, 128, 0.1));
 }
 
 .webdav-row.webdav-row-dir {
@@ -569,315 +466,16 @@
   color: var(--color-primary);
 }
 
-/* ===================================================================
- * Header — 仿主应用 SliverHeader 展开态
- * =================================================================== */
-
-.webdav-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-  padding: 10px 24px 12px;
-  flex-shrink: 0;
-  background: var(--color-bg-main);
-}
-
-.webdav-header-icon {
-  width: 150px;
-  height: 150px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 70%, #000));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-}
-
-.webdav-header-icon .text-primary {
-  color: white;
-}
-
-.webdav-header-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 150px;
-}
-
-.webdav-header-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.webdav-header-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-text-main);
-  margin: 0;
-  line-height: 1.2;
-  flex: 1;
-  min-width: 0;
-}
-
-.webdav-header-desc {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.webdav-header-stats {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  opacity: 0.8;
-}
-
-.webdav-header-actions {
-  margin-top: auto;
-  display: flex;
-  gap: 8px;
-}
-
-/* 操作按钮 - 仿主应用 ActionRow */
-.webdav-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-  height: 32px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  background: var(--bg-info-card, var(--color-bg-elevated));
-  color: var(--color-text-main);
-  border: none;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.webdav-action-btn:hover {
-  filter: brightness(0.95);
-}
-
-.webdav-action-btn:active {
-  transform: scale(0.95);
-}
-
-.webdav-action-btn.primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.webdav-action-btn.primary:hover {
-  background: var(--color-primary-hover);
-}
-
-/* ===================================================================
- * Tabs Sticky — 仿主应用吸顶标签栏
- * =================================================================== */
-
-.webdav-tabs-sticky {
-  position: sticky;
-  z-index: 110;
-  background: var(--color-bg-main);
-}
-
-.webdav-tabs-container {
-  padding: 0 24px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.webdav-tabs-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 56px;
-}
-
-.webdav-tabs-list {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex: 1;
-}
-
-.webdav-tabs-list::-webkit-scrollbar {
-  display: none;
-}
-
-.webdav-tabs-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-/* ===================================================================
- * Tab Trigger — 标签页触发器（仿主应用）
- * =================================================================== */
-
-.webdav-tab-trigger {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 100%;
-  padding-bottom: 4px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-main);
-  opacity: 0.6;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.2s;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.webdav-tab-trigger:hover {
-  opacity: 0.8;
-}
-
-.webdav-tab-trigger.is-active {
-  opacity: 1;
-}
-
-.webdav-tab-trigger.is-active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 2px;
-  background: var(--color-primary);
-  border-radius: 9999px;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.webdav-tab-trigger.is-active::after {
-  width: 24px;
-}
-
-.webdav-tab-label {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-/* Badge - 仿主应用 Badge 组件 */
-.webdav-tab-badge {
-  position: absolute;
-  top: -6px;
-  right: -20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 9999px;
-  font-size: 9px;
-  font-weight: bold;
-  font-variant-numeric: tabular-nums;
-  background: var(--color-text-main);
-  color: var(--color-bg-main);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  pointer-events: none;
-}
-
-/* ===================================================================
- * Search Box — 搜索框样式
- * =================================================================== */
-
-.webdav-search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.webdav-search-icon {
-  position: absolute;
-  left: 8px;
-  color: var(--color-text-main);
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.webdav-search-input {
-  width: 208px;
-  height: 36px;
-  padding: 0 12px 0 32px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border-light);
-  background: var(--color-bg-elevated);
-  color: var(--color-text-main);
-  font-size: 12px;
-  outline: none;
-  transition: all 0.15s ease;
-}
-
-.webdav-search-input::placeholder {
-  color: var(--color-text-subtle);
-}
-
-.webdav-search-input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb, 49, 207, 161), 0.15);
-}
-
-.webdav-locate-btn {
-  padding: 8px;
-  border-radius: 8px;
-  color: var(--color-text-main);
-  opacity: 0.6;
-  transition: all 0.2s ease;
-}
-
-.webdav-locate-btn:hover {
-  opacity: 1;
-  background: var(--control-hover-bg);
-}
-
-/* ===================================================================
- * Breadcrumb Bar — 面包屑 + 导航按钮
- * =================================================================== */
-
-.webdav-breadcrumb-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-  padding: 4px 24px;
-}
-
-.webdav-breadcrumb-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
+/* ---- Nav Buttons ---- */
 .webdav-nav-btn {
   padding: 6px;
   border-radius: 8px;
   color: var(--color-text-main);
   opacity: 0.6;
   transition: all 0.2s ease;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 .webdav-nav-btn:hover {

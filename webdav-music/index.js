@@ -1465,102 +1465,150 @@ const createBrowserPage = (ctx, state) => {
         const songCount = entries.value.filter((e) => !e.isCollection).length;
 
         return h("div", { class: "webdav-page" }, [
-          // 标题栏（仿主应用 SliverHeader 展开态）
-          h("div", { class: "webdav-header" }, [
-            h("div", { class: "webdav-header-icon" }, [
-              h(Icon, { icon: "tabler:server", width: 64, height: 64, class: "text-primary" }),
+          // === SliverHeader 风格头部 ===
+          h("div", { class: "flex items-start gap-5 px-6 pt-6 pb-2 flex-shrink-0", style: "background: var(--color-bg-main);" }, [
+            // 左侧大图标
+            h("div", { class: "w-[150px] h-[150px] rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden", style: "background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 70%, #000)); box-shadow: 0 8px 24px rgba(0,0,0,0.2);" }, [
+              h(Icon, { icon: "tabler:server", width: 48, height: 48, style: "color: white;" }),
             ]),
-            h("div", { class: "webdav-header-info" }, [
-              h("div", { class: "webdav-header-title-row" }, [
-                h("h1", { class: "webdav-header-title" }, "WebDAV"),
+            // 右侧信息
+            h("div", { class: "flex-1 min-w-0 flex flex-col justify-between min-h-[150px]" }, [
+              h("div", { class: "flex items-center justify-between gap-3" }, [
+                h("h1", { class: "text-[24px] font-bold m-0 leading-tight", style: "color: var(--color-text-main);" }, "WebDAV"),
+                h("div", { class: "px-2 py-0.5 rounded-full text-[10px] font-bold tracking-[1.2px] uppercase shrink-0", style: "background: color-mix(in srgb, var(--color-primary) 8%, transparent); color: var(--color-primary); border: 0.5px solid color-mix(in srgb, var(--color-primary) 20%, transparent);" }, "WEBDAV"),
               ]),
-              h("p", { class: "webdav-header-desc" }, "连接 WebDAV 服务器，浏览和播放云端音乐文件"),
-              h("div", { class: "webdav-header-stats" }, [
-                songCount > 0 ? h("span", songCount + " 首歌曲") : null,
-              ]),
-              h("div", { class: "webdav-header-actions" }, [
+              h("p", { class: "text-[13px] font-semibold m-0", style: "color: var(--color-text-secondary);" }, "连接WebDAV 服务器，浏览和播放云端音乐文件"),
+              h("div", { class: "text-[12px] font-semibold", style: "color: var(--color-text-secondary); opacity: 0.7;" }, `${songCount} 首歌曲`),
+              h("div", { class: "flex gap-2 mt-auto" }, [
                 h("button", {
-                  class: "webdav-action-btn primary",
+                  class: "inline-flex items-center gap-2 px-3 h-9 rounded-lg text-[12px] font-semibold transition-all active:scale-95 select-none bg-primary text-white border-none cursor-pointer",
                   onClick: playAll,
                 }, [
-                  h(Icon, { icon: ctx.icons.iconPlayerPlay, width: 14, height: 14 }),
-                  h("span", "播放"),
+                  h(Icon, { icon: ctx.icons.iconPlay, width: 16, height: 16 }),
+                  " 播放",
                 ]),
                 h("button", {
-                  class: "webdav-action-btn",
-                  onClick: () => { ctx.toast.info("批量操作功能开发中"); },
+                  class: "inline-flex items-center gap-2 px-3 h-9 rounded-lg text-[12px] font-semibold transition-all active:scale-95 select-none border-none cursor-pointer",
+                  style: { background: "var(--bg-info-card)", color: "var(--color-text-main)" },
+                  onClick: () => ctx.toast.info("批量操作功能开发中"),
                 }, [
-                  h(Icon, { icon: ctx.icons.iconListCheck, width: 14, height: 14 }),
-                  h("span", "批量"),
+                  h(Icon, { icon: ctx.icons.iconList, width: 16, height: 16 }),
+                  " 批量",
                 ]),
               ]),
             ]),
           ]),
 
-          // 库标签页（仿主应用 Tabs）
-          h("div", { class: "webdav-tabs-sticky" }, [
-            h("div", { class: "webdav-tabs-container" }, [
-              h("div", { class: "webdav-tabs-row" },
-                state.settings.libraries.map((library) => {
-                  const isActive = library.id === activeLibraryId.value;
-                  const displayName = library.name || "未命名库";
-                  const songCount = librarySongCounts.value[library.id] || 0;
-                  return h("button", {
-                    class: ["webdav-tab-trigger", isActive ? "is-active" : ""],
-                    onClick: () => switchLibrary(library.id),
-                  }, [
-                    h("span", { class: "webdav-tab-label" }, displayName),
-                    songCount > 0 ? h("span", { class: "webdav-tab-badge" }, songCount) : null,
-                  ]);
-                }),
-              ),
-              // 右侧搜索和定位
-              h("div", { class: "webdav-tabs-right" }, [
-                h("div", { class: "webdav-search-box" }, [
-                  h(Icon, { icon: ctx.icons.iconSearch, width: 14, height: 14, class: "webdav-search-icon" }),
-                  h("input", {
-                    class: "webdav-search-input",
-                    type: "text",
-                    placeholder: "搜索...",
-                    value: searchQuery.value,
-                    onInput: (e) => { searchQuery.value = e.target.value; },
+          // === 库标签栏（仿主应用 Tabs 吸顶效果） ===
+          h("div", { class: "sticky z-110 pt-2", style: "background: var(--color-bg-main);" }, [
+            h("div", { class: "px-6", style: "border-bottom: 1px solid var(--border-subtle);" }, [
+              h("div", { class: "flex items-center justify-between h-14" }, [
+                h("div", { class: "flex items-center gap-8 overflow-x-auto pt-[10px]", style: "scrollbar-width: none;" },
+                  state.settings.libraries.map((library) => {
+                    const isActive = library.id === activeLibraryId.value;
+                    const displayName = library.name || "未命名库";
+                    const count = librarySongCounts.value[library.id] || 0;
+                    return h("button", {
+                      class: "relative inline-flex items-center h-full pb-1 text-[14px] font-semibold bg-none border-none cursor-pointer whitespace-nowrap select-none",
+                      style: {
+                        color: "var(--color-text-main)",
+                        opacity: isActive ? "1" : "0.6",
+                        transition: "opacity 0.2s",
+                      },
+                      onClick: () => switchLibrary(library.id),
+                    }, [
+                      h("span", { class: "relative inline-flex items-center" }, [
+                        h("span", { class: "text-[14px] font-semibold" }, displayName),
+                        count >= 0
+                          ? h("span", {
+                              class: "absolute -top-1.5 -right-5 inline-flex min-w-[16px] h-[16px] items-center justify-center px-1 rounded-full text-[9px] font-bold tabular-nums shadow-sm select-none pointer-events-none",
+                              style: { background: "var(--color-text-main)", color: "var(--color-bg-main)" },
+                            }, count)
+                          : null,
+                      ]),
+                      h("span", {
+                        class: "absolute bottom-0 left-1/2 -translate-x-1/2 rounded-full transition-all duration-300",
+                        style: {
+                          width: isActive ? "24px" : "0",
+                          height: "2px",
+                          background: "var(--color-primary)",
+                        },
+                      }),
+                    ]);
                   }),
+                ),
+                h("div", { class: "flex items-center gap-2 flex-shrink-0" }, [
+                  // 搜索框
+                  h("div", { class: "relative flex items-center" }, [
+                    h(Icon, { icon: ctx.icons.iconSearch, width: 14, height: 14, class: "absolute left-2", style: { color: "var(--color-text-main)", opacity: "0.6", pointerEvents: "none" } }),
+                    h("input", {
+                      class: "w-[208px] h-[36px] pl-8 pr-3 rounded-lg border text-[12px] outline-none",
+                      style: { borderColor: "var(--color-border-light)", background: "var(--color-bg-elevated)", color: "var(--color-text-main)" },
+                      type: "text",
+                      placeholder: "搜索...",
+                      value: searchQuery.value,
+                      onInput: (e) => { searchQuery.value = e.target.value; },
+                    }),
+                  ]),
+                  // 定位按钮
+                  h(Button, {
+                    variant: "unstyled",
+                    size: "none",
+                    class: "p-2 rounded-lg",
+                    style: { color: "var(--color-text-main)", opacity: "0.6" },
+                    title: "定位当前播放",
+                    onClick: () => ctx.toast.info("定位功能开发中"),
+                  }, { default: () => h(Icon, { icon: ctx.icons.iconCurrentLocation, width: 18, height: 18 }) }),
                 ]),
-                h(Button, {
-                  variant: "unstyled",
-                  size: "none",
-                  class: "webdav-locate-btn",
-                  title: "定位当前播放",
-                  onClick: () => { ctx.toast.info("定位功能开发中"); },
-                }, { default: () => h(Icon, { icon: ctx.icons.iconCurrentLocation, width: 18, height: 18 }) }),
               ]),
             ]),
           ]),
 
-          // 面包屑 + 导航按钮（同一排）
-          h("div", { class: "webdav-breadcrumb-bar" }, [
-            h("div", { class: "webdav-breadcrumb" },
+          // === 面包屑 + 导航按钮 ===
+          h("div", { class: "flex items-center justify-between flex-shrink-0 px-6 py-1" }, [
+            h("div", { class: "flex items-center flex-wrap gap-0.5" },
               breadcrumbs.value.map((crumb, index) => {
                 const items = [];
-                if (index > 0) items.push(h("span", { class: "webdav-breadcrumb-sep" }, "/"));
+                if (index > 0) items.push(h("span", { class: "text-[var(--color-text-disabled)] mx-0.5 select-none" }, "/"));
                 items.push(h("button", {
-                  class: "webdav-breadcrumb-item",
+                  class: "bg-none border-none px-1.5 py-0.5 rounded text-[13px] cursor-pointer transition-all",
+                  style: {
+                    color: index === breadcrumbs.value.length - 1 ? "var(--color-text-main)" : "var(--color-text-subtle)",
+                    fontWeight: index === breadcrumbs.value.length - 1 ? "600" : "400",
+                  },
                   onClick: () => navigateTo(crumb.path),
                 }, crumb.name));
                 return items;
               }).flat(),
             ),
-            h("div", { class: "webdav-breadcrumb-actions" }, [
-              h("button", { class: "webdav-btn webdav-btn-icon webdav-nav-btn", title: "返回上级", onClick: navigateUp }, [
+            h("div", { class: "flex items-center gap-1" }, [
+              h("button", { class: "webdav-nav-btn", title: "返回上级", onClick: navigateUp }, [
                 h(Icon, { icon: ctx.icons.iconArrowLeft, width: 18, height: 18 }),
               ]),
-              h("button", { class: "webdav-btn webdav-btn-icon webdav-nav-btn", title: "刷新", onClick: refresh }, [
-                h(Icon, { icon: ctx.icons.iconRefresh, width: 18, height: 18 }),
+              h("button", { class: "webdav-nav-btn", title: "刷新", onClick: refresh }, [
+                h(Icon, { icon: ctx.icons.iconRefreshCw, width: 18, height: 18 })
               ]),
             ]),
           ]),
 
-          // 内容
+          // === 分割线（与面包屑之间的分隔） ===
+          h("hr", { class: "m-0 border-none flex-shrink-0", style: "border-top: 1px solid var(--border-subtle); height: 0;" }),
+          // === 列表表头（固定，不随内容滚动） ===
+          h("div", { class: "webdav-list-header flex-shrink-0" }, [
+            h("div", { class: ["webdav-col-index", _sortField === 'name' ? 'is-sorted' : ''], onClick: () => handleSort('name') }, [
+              "#",
+              h(Icon, { class: "sort-icon", icon: _sortField === 'name' ? (_sortOrder === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown) : ctx.icons.iconChevronUpDown, width: 14, height: 14 }),
+            ]),
+            h("div", { class: ["webdav-col-song", _sortField === 'title' ? 'is-sorted' : ''], onClick: () => handleSort('title') }, [
+              "歌曲",
+              h(Icon, { class: "sort-icon", icon: _sortField === 'title' ? (_sortOrder === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown) : ctx.icons.iconChevronUpDown, width: 14, height: 14 }),
+            ]),
+            h("div", { class: ["webdav-col-size", _sortField === 'size' ? 'is-sorted' : ''], onClick: () => handleSort('size') }, [
+              "大小",
+              h(Icon, { class: "sort-icon", icon: _sortField === 'size' ? (_sortOrder === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown) : ctx.icons.iconChevronUpDown, width: 14, height: 14 }),
+            ]),
+          ]),
+          // === 可滚动内容区域（仅歌曲行） ===
           h("div", { class: "webdav-content" }, [
             loading.value
               ? h("div", { class: "webdav-loading" }, "加载中...")
@@ -1571,22 +1619,7 @@ const createBrowserPage = (ctx, state) => {
                       h("p", { class: "webdav-empty-title" }, "此目录为空"),
                       h("p", { class: "webdav-empty-desc" }, "没有找到音乐文件"),
                     ])
-                  : [
-                      h("div", { class: "webdav-list-header" }, [
-                        h("div", { class: ["webdav-col-index", _sortField === 'name' ? 'is-sorted' : ''], onClick: () => handleSort('name') }, [
-                          "#",
-                          h(Icon, { class: "sort-icon", icon: _sortField === 'name' ? (_sortOrder === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown) : ctx.icons.iconChevronUpDown, width: 14, height: 14 }),
-                        ]),
-                        h("div", { class: ["webdav-col-song", _sortField === 'title' ? 'is-sorted' : ''], onClick: () => handleSort('title') }, [
-                          "歌曲",
-                          h(Icon, { class: "sort-icon", icon: _sortField === 'title' ? (_sortOrder === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown) : ctx.icons.iconChevronUpDown, width: 14, height: 14 }),
-                        ]),
-                        h("div", { class: ["webdav-col-size", _sortField === 'size' ? 'is-sorted' : ''], onClick: () => handleSort('size') }, [
-                          "大小",
-                          h(Icon, { class: "sort-icon", icon: _sortField === 'size' ? (_sortOrder === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown) : ctx.icons.iconChevronUpDown, width: 14, height: 14 }),
-                        ]),
-                      ]),
-                      h("div", { class: "webdav-list" },
+                  : h("div", { class: "webdav-list" },
                         sortedEntries.value.map((entry, idx) => {
                           const isDir = entry.isCollection;
                           const fileIdx = isDir ? null : sortedEntries.value.filter((e, i) => i <= idx && !e.isCollection).length;
@@ -1599,6 +1632,7 @@ const createBrowserPage = (ctx, state) => {
                             onDblclick: isDir ? () => navigateTo(filePath + "/") : () => handleDoubleTapPlay(entry),
                             onContextmenu: (e) => showContextMenu(e, entry, isDir),
                           }, [
+                            // 索引列
                             h("div", { class: "webdav-col-index" }, [
                               !isDir ? [
                                 isActive
@@ -1611,6 +1645,7 @@ const createBrowserPage = (ctx, state) => {
                                 h("div", { class: "webdav-index-folder-play", onClick: (e) => { e.stopPropagation(); playFolder(filePath + "/"); }, title: "播放此文件夹" }, [h(Icon, { icon: ctx.icons.iconPlayerPlay, width: 14, height: 14 })]),
                               ],
                             ]),
+                            // 歌曲列（封面 + 信息）
                             h("div", { class: "webdav-col-song" }, [
                               h("div", { class: ["webdav-cover", isDir ? "webdav-cover-dir" : ""] }, [
                                 isDir
@@ -1622,11 +1657,11 @@ const createBrowserPage = (ctx, state) => {
                                 !isDir ? h("span", { class: "webdav-song-artist" }, artist || "未知歌手") : null,
                               ]),
                             ]),
+                            // 大小列
                             h("div", { class: "webdav-col-size" }, isDir ? "" : formatSize(entry.contentLength)),
                           ]);
                         }),
                       ),
-                    ],
           ]),
           // 右键菜单
           contextMenu.value ? [
