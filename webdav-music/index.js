@@ -24,6 +24,10 @@ const DEFAULT_SETTINGS = {
   coverLyricSource: "embedded", // "embedded" | "kugou"
 };
 
+/** 模块级排序状态（不依赖组件生命周期，应用关闭前持久保持） */
+let _sortField = null; // 'name' | 'title' | 'size' | null
+let _sortOrder = null; // 'asc' | 'desc' | null
+
 
 /* ===================================================================
  * Cover Fallback — 跟随主应用兜底封面机制
@@ -840,6 +844,7 @@ const ABOUT_HTML = `<div class="webdav-about">
 <tr><td>用户名</td><td>Basic Auth 用户名，留空表示无需认证</td><td>-</td></tr>
 <tr><td>密码</td><td>Basic Auth 密码</td><td>-</td></tr>
 <tr><td>根目录路径</td><td>浏览音乐的起始路径</td><td>/</td></tr>
+<tr><td>在线匹配封面歌词</td><td>开启后使用酷狗搜索出的封面和歌词，关闭则优先使用歌曲内嵌的封面和歌词</td><td>关闭</td></tr>
 </table>
 
 <h2>支持的音频格式</h2>
@@ -855,19 +860,44 @@ const ABOUT_HTML = `<div class="webdav-about">
 <tr><td><code>编号. 歌手 - 标题</code></td><td><code>01. 林俊杰 - 江南.mp3</code></td><td>歌手：林俊杰，标题：江南</td></tr>
 <tr><td><code>编号- 歌手 - 标题</code></td><td><code>02-陈奕迅-十年.mp3</code></td><td>歌手：陈奕迅，标题：十年</td></tr>
 </table>
-<blockquote>如果文件名不符合上述格式，则整个文件名（不含扩展名）作为标题，歌手显示为「未知歌手」。若音频文件包含内嵌标签（ID3v2 / FLAC），以嵌入标签为准覆盖文件名解析结果。</blockquote>
+<blockquote>编号前缀为行首的数字后跟 .、- 或空格，解析时会自动去除。如果文件名不符合上述格式，则整个文件名（不含扩展名）作为标题，歌手显示为「未知歌手」。若音频文件包含内嵌标签（ID3v2 / FLAC），解析后会以嵌入标签为准覆盖文件名解析结果。</blockquote>
 
-<h2>封面优先级</h2>
+<h2>封面与歌词获取</h2>
+<p>插件支持两种封面和歌词获取模式，可在插件设置中切换：</p>
+<h3>关闭「在线匹配封面歌词」（默认）</h3>
+<p>优先使用歌曲内嵌数据，缺少时通过酷狗 API 补充：</p>
 <ol>
-<li>音频文件内嵌封面（ID3v2 APIC / FLAC Picture）</li>
+<li>音频文件内嵌封面和歌词（ID3v2 / FLAC 标签）</li>
 <li>目录下的封面图片文件（cover.jpg、folder.jpg 等）</li>
+<li>酷狗 API 搜索补全缺失的封面或歌词</li>
+<li>主应用兜底封面（跟随 cover-fallback 插件设置动态切换）</li>
+</ol>
+<h3>开启「在线匹配封面歌词」</h3>
+<p>优先使用酷狗搜索结果，不保证封面和歌词的准确性：</p>
+<ol>
+<li>酷狗 API 搜索结果中的封面和歌词</li>
+<li>音频文件内嵌数据补充酷狗未提供的字段</li>
 <li>主应用兜底封面（跟随 cover-fallback 插件设置动态切换）</li>
 </ol>
 
 <h2>依赖</h2>
-<p>EchoMusic >= 2.2.6-beta.11</p>
+<p>EchoMusic &gt;= 2.2.6-beta.11</p>
 
 <h2>更新日志</h2>
+<h3>v1.0.5</h3>
+<ul>
+<li>新增「在线匹配封面歌词」开关设置，支持切换封面和歌词获取模式</li>
+<li>修复 Windows SMTC（系统媒体浮窗）封面显示不稳定的问题</li>
+<li>优化酷狗 API 调用逻辑：避免在歌曲已有内嵌封面和歌词时发起不必要的搜索请求</li>
+<li>修复手动排序方式在切换目录后被重置的问题，排序状态在应用关闭前持续保持</li>
+</ul>
+<h3>v1.0.4</h3>
+<ul>
+<li>歌曲列表支持点击「#」「歌曲」「大小」表头进行排序，文件夹始终置顶不参与排序</li>
+<li>右键菜单功能：歌曲和文件夹支持右键「立即播放」和「下一首播放」</li>
+<li>修复点击播放按钮或右键「立即播放」时替换整个播放列表的问题</li>
+<li>修复右键「下一首播放」无效的问题</li>
+</ul>
 <h3>v1.0.3</h3>
 <ul>
 <li>修复上一首/下一首切歌及重启应用后恢复播放时无法自动获取歌曲元数据的问题</li>
@@ -1006,40 +1036,42 @@ const createBrowserPage = (ctx, state) => {
       const error = ref("");
       const coverCache = ref({});
 
-      /** 排序状态 */
-      const sortField = ref(null); // 'name' | 'title' | 'size' | null
-      const sortOrder = ref(null); // 'asc' | 'desc' | null
+      /** 排序触发器（模块级排序状态变更时 +1，驱动 computed 重新计算） */
+      const sortTick = ref(0);
 
       const handleSort = (field) => {
-        if (sortField.value === field) {
-          if (sortOrder.value === 'asc') sortOrder.value = 'desc';
-          else if (sortOrder.value === 'desc') { sortField.value = null; sortOrder.value = null; }
-          else sortOrder.value = 'asc';
+        if (_sortField === field) {
+          if (_sortOrder === 'asc') _sortOrder = 'desc';
+          else if (_sortOrder === 'desc') { _sortField = null; _sortOrder = null; }
+          else _sortOrder = 'asc';
         } else {
-          sortField.value = field;
-          sortOrder.value = 'asc';
+          _sortField = field;
+          _sortOrder = 'asc';
         }
+        sortTick.value++;
       };
 
       /** 排序后的条目：文件夹始终在最上方，歌曲按规则排序 */
       const sortedEntries = computed(() => {
+        // 依赖 sortTick 确保模块级状态变更时重新计算
+        void sortTick.value;
         const dirs = entries.value.filter((e) => e.isCollection);
         const files = entries.value.filter((e) => !e.isCollection);
-        if (!sortField.value || !sortOrder.value) {
+        if (!_sortField || !_sortOrder) {
           return [...dirs, ...files];
         }
         const sortedFiles = [...files].sort((a, b) => {
           let cmp = 0;
-          if (sortField.value === 'name') {
+          if (_sortField === 'name') {
             cmp = a.name.localeCompare(b.name);
-          } else if (sortField.value === 'title') {
+          } else if (_sortField === 'title') {
             const { title: ta } = parseTitleArtist(a.name);
             const { title: tb } = parseTitleArtist(b.name);
             cmp = (ta || a.name).localeCompare(tb || b.name);
-          } else if (sortField.value === 'size') {
+          } else if (_sortField === 'size') {
             cmp = (a.contentLength || 0) - (b.contentLength || 0);
           }
-          return sortOrder.value === 'desc' ? -cmp : cmp;
+          return _sortOrder === 'desc' ? -cmp : cmp;
         });
         return [...dirs, ...sortedFiles];
       });
@@ -1430,42 +1462,42 @@ const createBrowserPage = (ctx, state) => {
                       // 表头行（仿 SongListHeader，支持点击排序）
                       h("div", { class: "webdav-list-header" }, [
                         h("div", {
-                          class: ["webdav-col-index", sortField.value === 'name' ? 'is-sorted' : ''],
+                          class: ["webdav-col-index", _sortField === 'name' ? 'is-sorted' : ''],
                           onClick: () => handleSort('name'),
                         }, [
                           "#",
                           h(Icon, {
                             class: "sort-icon",
-                            icon: sortField.value === 'name'
-                              ? (sortOrder.value === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown)
+                            icon: _sortField === 'name'
+                              ? (_sortOrder === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown)
                               : ctx.icons.iconChevronUpDown,
                             width: 14,
                             height: 14,
                           }),
                         ]),
                         h("div", {
-                          class: ["webdav-col-song", sortField.value === 'title' ? 'is-sorted' : ''],
+                          class: ["webdav-col-song", _sortField === 'title' ? 'is-sorted' : ''],
                           onClick: () => handleSort('title'),
                         }, [
                           "\u6B4C\u66F2",
                           h(Icon, {
                             class: "sort-icon",
-                            icon: sortField.value === 'title'
-                              ? (sortOrder.value === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown)
+                            icon: _sortField === 'title'
+                              ? (_sortOrder === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown)
                               : ctx.icons.iconChevronUpDown,
                             width: 14,
                             height: 14,
                           }),
                         ]),
                         h("div", {
-                          class: ["webdav-col-size", sortField.value === 'size' ? 'is-sorted' : ''],
+                          class: ["webdav-col-size", _sortField === 'size' ? 'is-sorted' : ''],
                           onClick: () => handleSort('size'),
                         }, [
                           "\u5927\u5C0F",
                           h(Icon, {
                             class: "sort-icon",
-                            icon: sortField.value === 'size'
-                              ? (sortOrder.value === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown)
+                            icon: _sortField === 'size'
+                              ? (_sortOrder === 'asc' ? ctx.icons.iconSortUp : ctx.icons.iconSortDown)
                               : ctx.icons.iconChevronUpDown,
                             width: 14,
                             height: 14,
