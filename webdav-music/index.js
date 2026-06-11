@@ -313,7 +313,6 @@ const syncToStores = (ctx, songId, patch) => {
             });
           } catch (e) {
             console.warn('[webdav-music] SMTC cover conversion failed, using default:', e);
-            // 使用默认的1x1像素透明JPEG作为备选
             const defaultCoverUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAIAAoDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAFRABAQAAAAAAAAAAAAAAAAAAAAf/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8ApgAH/9k=';
             window.electron.mediaControls.updateMetadata({
               title: snapshot.title || "未知歌曲",
@@ -329,6 +328,36 @@ const syncToStores = (ctx, songId, patch) => {
   } catch (err) {
     console.error("[webdav-music] syncToStores error:", err);
   }
+};
+
+/**
+ * 从歌曲对象构建 patch（统一内嵌标签和酷狗 API 的 patch 构建逻辑）
+ * @param {Object} song - 歌曲对象
+ * @param {Object} source - 数据源（tags 或 kugou match）
+ * @param {string} sourceType - 数据源类型 'embedded' | 'kugou'
+ * @returns {Object} patch 对象
+ */
+const buildPatchFromSource = (song, source, sourceType) => {
+  const patch = {};
+  
+  if (sourceType === 'embedded') {
+    // 从内嵌标签构建 patch
+    if (source.title) { song.title = source.title; song.name = source.title; patch.title = source.title; patch.name = source.title; }
+    if (source.artist) { song.artist = source.artist; song.artists = [{ name: source.artist }]; song.singers = [{ name: source.artist }]; patch.artist = source.artist; patch.artists = [{ name: source.artist }]; patch.singers = [{ name: source.artist }]; }
+    if (source.album) { song.album = source.album; song.albumName = source.album; patch.album = source.album; patch.albumName = source.album; }
+    if (source.coverData) { const blob = new Blob([source.coverData], { type: source.coverMime || "image/jpeg" }); const cu = URL.createObjectURL(blob); song.coverUrl = cu; song.cover = cu; patch.coverUrl = cu; patch.cover = cu; }
+    if (source.lyric) { song.lyric = source.lyric; patch.lyric = source.lyric; }
+    if (source.duration > 0) { song.duration = source.duration; patch.duration = source.duration; }
+  } else if (sourceType === 'kugou') {
+    // 从酷狗 API 结果构建 patch
+    const { coverUrl, albumName, matchSinger, lyricText } = source;
+    if (coverUrl && !song.coverUrl) { song.coverUrl = coverUrl; song.cover = coverUrl; patch.coverUrl = coverUrl; patch.cover = coverUrl; }
+    if (albumName && !song.album) { song.album = albumName; song.albumName = albumName; patch.album = albumName; patch.albumName = albumName; }
+    if (matchSinger && (!song.artist || song.artist === "未知歌手")) { song.artist = matchSinger; song.artists = [{ name: matchSinger }]; song.singers = [{ name: matchSinger }]; patch.artist = matchSinger; patch.artists = [{ name: matchSinger }]; patch.singers = [{ name: matchSinger }]; }
+    if (lyricText && !song.lyric) { song.lyric = lyricText; patch.lyric = lyricText; }
+  }
+  
+  return patch;
 };
 
 /**
@@ -366,7 +395,6 @@ const enrichFromKugouApi = async (ctx, song) => {
       return;
     }
     // 从匹配结果中提取元数据（字段名参考主应用 mapSearchSong）
-    const patch = {};
     const fileHash = match.FileHash;
     const rawCoverInput = match.Image || match.trans_param?.union_cover || match.cover || "";
     const coverUrl = formatPicUrl(rawCoverInput);
@@ -374,29 +402,10 @@ const enrichFromKugouApi = async (ctx, song) => {
     const albumName = match.AlbumName || "";
     const matchSinger = match.SingerName || "";
     const matchTitle = match.SongName || match.FileName || match.OriSongName || "";
-    // 补全封面（仅当歌曲还没有封面时）
-    if (coverUrl && !song.coverUrl) {
-      song.coverUrl = coverUrl;
-      song.cover = coverUrl;
-      patch.coverUrl = coverUrl;
-      patch.cover = coverUrl;
-    }
-    // 补全专辑名
-    if (albumName && !song.album) {
-      song.album = albumName;
-      song.albumName = albumName;
-      patch.album = albumName;
-      patch.albumName = albumName;
-    }
-    // 补全歌手名（仅在原文案为文件名/未知时）
-    if (matchSinger && (!song.artist || song.artist === "未知歌手")) {
-      song.artist = matchSinger;
-      song.artists = [{ name: matchSinger }];
-      song.singers = [{ name: matchSinger }];
-      patch.artist = matchSinger;
-      patch.artists = [{ name: matchSinger }];
-      patch.singers = [{ name: matchSinger }];
-    }
+    
+    // 构建 patch
+    const kugouData = { coverUrl, albumName, matchSinger, lyricText: "" };
+    
     // 搜索歌词（通过 FileHash）—— 仅当歌曲还没有歌词时
     if (fileHash && !song.lyric) {
       try {
@@ -410,15 +419,16 @@ const enrichFromKugouApi = async (ctx, song) => {
           );
           const lyricText = lyricDetail?.decodeContent || lyricDetail?.content || lyricDetail?.data?.content;
           if (lyricText) {
-            song.lyric = lyricText;
-            patch.lyric = lyricText;
+            kugouData.lyricText = lyricText;
           }
         }
       } catch (lyricErr) {
         console.warn("[webdav-music] Kugou lyric fetch failed:", lyricErr.message);
       }
     }
+    
     // 同步到 stores
+    const patch = buildPatchFromSource(song, kugouData, 'kugou');
     if (Object.keys(patch).length > 0) {
       syncToStores(ctx, song.id, patch);
       console.log("[webdav-music] enrichFromKugouApi applied:", Object.keys(patch), "title:", matchTitle);
@@ -457,13 +467,7 @@ const enrichTrack = async (ctx, state, song) => {
     const tags = await readEmbeddedTags(ctx, state.settings, song._filePath);
     if (tags) {
       console.log("[webdav-music] Embedded tags (kugou mode):", "title:", !!tags.title, "artist:", !!tags.artist, "album:", !!tags.album, "cover:", !!tags.coverData, "lyric:", !!tags.lyric, "duration:", tags.duration);
-      const patch = {};
-      if (tags.title && !song.title) { song.title = tags.title; song.name = tags.title; patch.title = tags.title; patch.name = tags.title; }
-      if (tags.artist && !song.artist) { song.artist = tags.artist; song.artists = [{ name: tags.artist }]; song.singers = [{ name: tags.artist }]; patch.artist = tags.artist; patch.artists = [{ name: tags.artist }]; patch.singers = [{ name: tags.artist }]; }
-      if (tags.album && !song.album) { song.album = tags.album; song.albumName = tags.album; patch.album = tags.album; patch.albumName = tags.album; }
-      if (tags.coverData && !song.coverUrl) { const blob = new Blob([tags.coverData], { type: tags.coverMime || "image/jpeg" }); const cu = URL.createObjectURL(blob); song.coverUrl = cu; song.cover = cu; patch.coverUrl = cu; patch.cover = cu; }
-      if (tags.lyric && !song.lyric) { song.lyric = tags.lyric; patch.lyric = tags.lyric; }
-      if (tags.duration > 0 && !song.duration) { song.duration = tags.duration; patch.duration = tags.duration; }
+      const patch = buildPatchFromSource(song, tags, 'embedded');
       if (Object.keys(patch).length > 0) {
         syncToStores(ctx, song.id, patch);
         console.log("[webdav-music] enrichTrack (kugou mode) applied embedded patch:", Object.keys(patch));
@@ -481,13 +485,7 @@ const enrichTrack = async (ctx, state, song) => {
       return song;
     }
     console.log("[webdav-music] Embedded tags:", "title:", !!tags.title, "artist:", !!tags.artist, "album:", !!tags.album, "cover:", !!tags.coverData, "lyric:", !!tags.lyric, "duration:", tags.duration);
-    const patch = {};
-    if (tags.title) { song.title = tags.title; song.name = tags.title; patch.title = tags.title; patch.name = tags.title; }
-    if (tags.artist) { song.artist = tags.artist; song.artists = [{ name: tags.artist }]; song.singers = [{ name: tags.artist }]; patch.artist = tags.artist; patch.artists = [{ name: tags.artist }]; patch.singers = [{ name: tags.artist }]; }
-    if (tags.album) { song.album = tags.album; song.albumName = tags.album; patch.album = tags.album; patch.albumName = tags.album; }
-    if (tags.coverData) { const blob = new Blob([tags.coverData], { type: tags.coverMime || "image/jpeg" }); const cu = URL.createObjectURL(blob); song.coverUrl = cu; song.cover = cu; patch.coverUrl = cu; patch.cover = cu; }
-    if (tags.lyric) { song.lyric = tags.lyric; patch.lyric = tags.lyric; }
-    if (tags.duration > 0) { song.duration = tags.duration; patch.duration = tags.duration; }
+    const patch = buildPatchFromSource(song, tags, 'embedded');
     syncToStores(ctx, song.id, patch);
     // 嵌入标签有内容但缺少封面或歌词，启动 Kugou API 补全
     if (!tags.coverData || !tags.lyric) {
@@ -499,23 +497,14 @@ const enrichTrack = async (ctx, state, song) => {
   return song;
 };
 
-/** 从文件扩展名检测音质（无需网络请求） */
-const detectAudioQualityFromExtension = (filePath) => {
+/**
+ * 检测音频音质（统一检测逻辑，供 audioSource.resolve 和 enrichTrack 使用）
+ * @param {Object} settings - 插件设置
+ * @param {string} filePath - 文件路径
+ * @returns {Promise<string|null>} 音质标识
+ */
+const detectAudioQuality = async (settings, filePath) => {
   if (!filePath) return null;
-  const ext = filePath.slice(filePath.lastIndexOf(".") + 1).toLowerCase();
-  if (ext === "flac") return "flac";
-  if (ext === "wav" || ext === "ape" || ext === "aiff" || ext === "alac" || ext === "wv") return "flac";
-  if (ext === "dsf" || ext === "dff") return "super";
-  if (ext === "mp3") return null; // MP3 需要读取头部检测比特率
-  if (ext === "m4a" || ext === "aac") return "320"; // AAC/M4A 通常为 HQ
-  return null;
-};
-
-/** 检测音质并设置到播放器 store，锁定音质不可切换 */
-const detectAndSetQuality = async (ctx, state, song) => {
-  if (!state?.settings || !song._filePath || !ctx.stores?.player) return;
-  const settings = state.settings;
-  const filePath = song._filePath;
   // 1) 优先使用扩展名检测（即时完成，无需网络请求）
   let quality = detectAudioQualityFromExtension(filePath);
   // 2) MP3 或无扩展名匹配时，尝试 Range 请求读取头部检测
@@ -528,18 +517,25 @@ const detectAndSetQuality = async (ctx, state, song) => {
         quality = detectAudioQualityFromHead(head, filePath);
       }
     } catch (err) {
-      console.warn("[webdav-music] detectAndSetQuality Range request failed:", err.message);
+      console.warn("[webdav-music] detectAudioQuality Range request failed:", err.message);
     }
   }
   // 3) MP3 仍然检测失败时，默认设为 320
   if (!quality && filePath.toLowerCase().endsWith(".mp3")) {
     quality = "320";
   }
+  return quality;
+};
+
+/** 检测音质并设置到播放器 store，锁定音质不可切换 */
+const detectAndSetQuality = async (ctx, state, song) => {
+  if (!state?.settings || !song._filePath || !ctx.stores?.player) return;
+  const quality = await detectAudioQuality(state.settings, song._filePath);
   if (!quality) {
-    console.log("[webdav-music] Could not detect quality for:", filePath);
+    console.log("[webdav-music] Could not detect quality for:", song._filePath);
     return;
   }
-  console.log("[webdav-music] Detected quality:", quality, "for", filePath);
+  console.log("[webdav-music] Detected quality:", quality, "for", song._filePath);
   // 延迟到下一轮事件循环再写入，确保在 playTrack 的
   // currentResolvedAudioQuality = null (playback.ts:182) 和
   // currentAudioQualityOverride = null (playback.ts:239) 之后最终写入正确值
@@ -884,6 +880,12 @@ const ABOUT_HTML = `<div class="webdav-about">
 <p>EchoMusic &gt;= 2.2.6-beta.11</p>
 
 <h2>更新日志</h2>
+<h3>v1.0.6</h3>
+<ul>
+<li>代码重构：提取 buildPatchFromSource 统一内嵌标签和酷狗 API 的 patch 构建逻辑</li>
+<li>代码重构：提取 detectAudioQuality 统一音质检测逻辑，消除重复代码</li>
+<li>优化 enrichFromKugouApi 函数结构，提高可读性</li>
+</ul>
 <h3>v1.0.5</h3>
 <ul>
 <li>新增「在线匹配封面歌词」开关设置，支持切换封面和歌词获取模式</li>
@@ -1609,25 +1611,7 @@ export async function activate(ctx) {
       if (!settings) return null;
       const filePath = context.track._filePath;
       const url = buildAuthUrl(settings, filePath);
-      // 1) 优先使用扩展名检测（即时完成，无需网络请求）
-      let quality = detectAudioQualityFromExtension(filePath);
-      // 2) MP3 或无扩展名匹配时，尝试 Range 请求读取头部检测
-      if (!quality) {
-        try {
-          const headBuf = await webdavFetchRaw(settings, filePath, { headers: { Range: "bytes=0-262143" } });
-          if (headBuf?.ok) {
-            const ab = await headBuf.arrayBuffer();
-            const head = new Uint8Array(ab);
-            quality = detectAudioQualityFromHead(head, filePath);
-          }
-        } catch (err) {
-          console.warn("[webdav-music] Audio source resolver quality detect failed:", err.message);
-        }
-      }
-      // 3) MP3 仍然检测失败时，默认设为 320
-      if (!quality && filePath.toLowerCase().endsWith(".mp3")) {
-        quality = "320";
-      }
+      const quality = await detectAudioQuality(settings, filePath);
       if (quality) return { url, quality };
       return url; // fallback: 只返回 URL
     },

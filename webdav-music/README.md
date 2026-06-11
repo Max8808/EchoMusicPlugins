@@ -88,6 +88,12 @@ EchoMusicPlugins/
 
 ## 更新日志
 
+### v1.0.6
+
+- 代码重构：提取 `buildPatchFromSource` 统一内嵌标签和酷狗 API 的 patch 构建逻辑
+- 代码重构：提取 `detectAudioQuality` 统一音质检测逻辑，消除 audioSource.resolve 和 detectAndSetQuality 中的重复代码
+- 优化 `enrichFromKugouApi` 函数结构，提高可读性
+
 ### v1.0.5
 
 - 新增「在线匹配封面歌词」开关设置，支持切换封面和歌词获取模式
