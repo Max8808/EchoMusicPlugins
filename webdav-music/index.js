@@ -1140,50 +1140,52 @@ const createSettingsPanel = (ctx, state) => {
       };
 
       return () =>
-        h(Tabs, { modelValue: activeTab.value, "onUpdate:modelValue": (v) => { activeTab.value = v; } }, {
-          default: () => [
-            h(TabsList, {}, { default: () => [
-              h(TabsTrigger, { value: "settings" }, { default: () => "设置" }),
-              h(TabsTrigger, { value: "about" }, { default: () => "关于" }),
-            ]}),
-            h(TabsContent, { value: "settings" }, { default: () =>
-              h("div", { style: "display: grid; gap: 16px; padding-top: 8px;" }, [
-                // WebDAV 库列表
-                h("div", { style: "display: grid; gap: 8px;" }, [
-                  h("div", { style: "display: flex; align-items: center; justify-content: space-between;" }, [
-                    h("span", { style: "font-size: 14px; font-weight: 600; color: var(--color-text-main);" }, "WebDAV 库"),
-                    h(Button, {
-                      size: "xs",
-                      variant: "outline",
-                      onClick: addLibrary,
-                    }, { default: () => "+ 添加库" }),
+        h("div", { style: "display: flex; flex-direction: column;" }, [
+          h(Tabs, { modelValue: activeTab.value, "onUpdate:modelValue": (v) => { activeTab.value = v; }, style: "flex: 1; min-height: 0; overflow: hidden;" }, {
+            default: () => [
+              h(TabsList, {}, { default: () => [
+                h(TabsTrigger, { value: "settings" }, { default: () => "设置" }),
+                h(TabsTrigger, { value: "about" }, { default: () => "关于" }),
+              ]}),
+              h(TabsContent, { value: "settings" }, { default: () =>
+                h("div", { style: "max-height: 55vh; overflow-y: auto; display: grid; gap: 16px; align-content: start; padding-top: 8px;" }, [
+                  // WebDAV 库列表
+                  h("div", { style: "display: grid; gap: 8px;" }, [
+                    h("div", { style: "display: flex; align-items: center; justify-content: space-between;" }, [
+                      h("span", { style: "font-size: 14px; font-weight: 600; color: var(--color-text-main);" }, "WebDAV 库"),
+                      h(Button, {
+                        size: "xs",
+                        variant: "outline",
+                        onClick: addLibrary,
+                      }, { default: () => "+ 添加库" }),
+                    ]),
+                    draft.libraries.length === 0
+                      ? h("p", { style: "font-size: 12px; color: var(--color-text-secondary); text-align: center; padding: 16px;" }, "暂无 WebDAV 库，点击上方按钮添加")
+                      : h("div", { style: "display: grid; gap: 8px;" }, draft.libraries.map((lib) => renderLibraryCard(lib))),
                   ]),
-                  draft.libraries.length === 0
-                    ? h("p", { style: "font-size: 12px; color: var(--color-text-secondary); text-align: center; padding: 16px;" }, "暂无 WebDAV 库，点击上方按钮添加")
-                    : h("div", { style: "display: grid; gap: 8px;" }, draft.libraries.map((lib) => renderLibraryCard(lib))),
+                  // 全局设置
+                  h("div", { style: "border-top: 1px solid var(--border-subtle); padding-top: 12px;" }, [
+                    h("span", { style: "font-size: 14px; font-weight: 600; color: var(--color-text-main); display: block; margin-bottom: 8px;" }, "全局设置"),
+                    renderSwitchRow(
+                      "在线匹配封面歌词",
+                      "开启后使用酷狗搜索出的封面和歌词，关闭则优先使用歌曲内嵌的封面和歌词",
+                      draft.coverLyricSource === "kugou",
+                      (v) => { draft.coverLyricSource = v ? "kugou" : "embedded"; },
+                    ),
+                  ]),
                 ]),
-                // 全局设置
-                h("div", { style: "border-top: 1px solid var(--border-subtle); padding-top: 12px;" }, [
-                  h("span", { style: "font-size: 14px; font-weight: 600; color: var(--color-text-main); display: block; margin-bottom: 8px;" }, "全局设置"),
-                  renderSwitchRow(
-                    "在线匹配封面歌词",
-                    "开启后使用酷狗搜索出的封面和歌词，关闭则优先使用歌曲内嵌的封面和歌词",
-                    draft.coverLyricSource === "kugou",
-                    (v) => { draft.coverLyricSource = v ? "kugou" : "embedded"; },
-                  ),
-                ]),
-                // 按钮行
-                h("div", { style: "display: flex; gap: 8px; justify-content: flex-end;" }, [
-                  h(Button, { size: "xs", onClick: reset, variant: "outline" }, { default: () => "重置" }),
-                  h(Button, { size: "xs", onClick: save }, { default: () => "保存" }),
-                ]),
-              ])
-            }),
-            h(TabsContent, { value: "about" }, { default: () =>
-              h("div", { style: "padding-top: 8px; max-height: 55vh; overflow-y: auto;", innerHTML: ABOUT_HTML })
-            }),
-          ],
-        });
+              }),
+              h(TabsContent, { value: "about" }, { default: () =>
+                h("div", { style: "padding-top: 8px; max-height: 55vh; overflow-y: auto;", innerHTML: ABOUT_HTML })
+              }),
+            ],
+          }),
+          // 按钮行（sticky 固定底部）
+          h("div", { style: "display: flex; gap: 8px; justify-content: flex-end; padding: 12px 0 0; flex-shrink: 0; position: sticky; bottom: 0; background: inherit; z-index: 1;" }, [
+            h(Button, { size: "xs", onClick: reset, variant: "outline" }, { default: () => "重置" }),
+            h(Button, { size: "xs", onClick: save }, { default: () => "保存" }),
+          ]),
+        ]);
     },
   });
 };
