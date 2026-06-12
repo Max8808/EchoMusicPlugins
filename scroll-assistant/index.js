@@ -8,6 +8,10 @@ const DEFAULT_SETTINGS = {
 
 const STYLE = `
 .echo-scroll-assistant-button {
+  --echo-scroll-assistant-stack-y: 0px;
+  --echo-scroll-assistant-hover-y: 0px;
+  --echo-scroll-assistant-appear-y: 0px;
+  --echo-scroll-assistant-active-scale: 1;
   position: fixed;
   width: 44px;
   height: 44px;
@@ -27,21 +31,29 @@ const STYLE = `
     color 0.18s ease,
     border-color 0.18s ease,
     box-shadow 0.18s ease,
-    transform 0.3s ease,
+    transform 0.16s cubic-bezier(0.2, 0, 0, 1),
     opacity 0.3s ease,
     right 0.16s cubic-bezier(0.2, 0, 0, 1),
     bottom 0.16s cubic-bezier(0.2, 0, 0, 1);
+  transform: translateY(
+      calc(
+        var(--echo-scroll-assistant-stack-y) +
+        var(--echo-scroll-assistant-hover-y) +
+        var(--echo-scroll-assistant-appear-y)
+      )
+    )
+    scale(var(--echo-scroll-assistant-active-scale));
 }
 
 .echo-scroll-assistant-button:hover {
   color: var(--color-primary);
   border-color: color-mix(in srgb, var(--color-primary) 60%, var(--control-border));
   box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18);
-  transform: translateY(-1px);
+  --echo-scroll-assistant-hover-y: -1px;
 }
 
 .echo-scroll-assistant-button:active {
-  transform: scale(0.96);
+  --echo-scroll-assistant-active-scale: 0.96;
 }
 
 .echo-scroll-assistant-button-icon {
@@ -71,7 +83,7 @@ const STYLE = `
 .echo-scroll-assistant-fade-enter-from,
 .echo-scroll-assistant-fade-leave-to {
   opacity: 0;
-  transform: translateY(10px);
+  --echo-scroll-assistant-appear-y: 10px;
 }
 
 .echo-scroll-assistant-settings {
@@ -168,17 +180,57 @@ const isVisibleElement = (element) => {
   const rect = element.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return false;
   const style = window.getComputedStyle(element);
-  return (
-    style.display !== "none" &&
-    style.visibility !== "hidden" &&
-    Number(style.opacity || 1) > 0.01
-  );
+  return style.display !== "none" && style.visibility !== "hidden";
 };
 
 const getHostBackToTopElement = () =>
   [".back-to-top-btn", ".settings-back-to-top.visible"]
     .map((selector) => document.querySelector(selector))
     .find(isVisibleElement) || null;
+
+const getStableElementBounds = (element) => {
+  const rect = element.getBoundingClientRect();
+  const style = window.getComputedStyle(element);
+  const bottom = Number.parseFloat(style.bottom);
+  const right = Number.parseFloat(style.right);
+  const parent =
+    element.offsetParent instanceof HTMLElement ? element.offsetParent : null;
+  const parentRect = parent?.getBoundingClientRect();
+
+  if (
+    parentRect &&
+    Number.isFinite(bottom) &&
+    Number.isFinite(right) &&
+    style.position === "absolute"
+  ) {
+    return {
+      right: parentRect.right - right,
+      bottom: parentRect.bottom - bottom,
+      height: element.offsetHeight || rect.height,
+    };
+  }
+
+  return {
+    right: rect.right,
+    bottom: rect.bottom,
+    height: element.offsetHeight || rect.height,
+  };
+};
+
+const isBackToTopNode = (node) => {
+  if (!(node instanceof Element)) return false;
+  return (
+    node.matches(".back-to-top-btn, .settings-back-to-top") ||
+    Boolean(node.querySelector(".back-to-top-btn, .settings-back-to-top"))
+  );
+};
+
+const shouldHandleBackToTopMutation = (mutation) => {
+  if (mutation.type === "attributes") {
+    return isBackToTopNode(mutation.target);
+  }
+  return [...mutation.addedNodes, ...mutation.removedNodes].some(isBackToTopNode);
+};
 
 const isUsableContainer = (ctx, element) => {
   if (!element || !document.contains(element)) return false;
@@ -249,15 +301,11 @@ const createFloatingButton = (ctx) => {
         metrics.value = ctx.scroll.getState(container.value);
         const rect = container.value.getBoundingClientRect();
         const backToTopElement = getHostBackToTopElement();
-        const backToTopRect = backToTopElement?.getBoundingClientRect();
         bounds.value = {
           right: rect.right,
           bottom: rect.bottom,
-          backToTop: backToTopRect
-            ? {
-                top: backToTopRect.top,
-                right: backToTopRect.right,
-              }
+          backToTop: backToTopElement
+            ? getStableElementBounds(backToTopElement)
             : null,
         };
       };
@@ -293,17 +341,20 @@ const createFloatingButton = (ctx) => {
             ? window.innerWidth - bounds.value.backToTop.right
             : window.innerWidth - bounds.value.right + 24,
         );
-        const stackedAboveBackToTop =
-          state.settings.avoidBackToTop && bounds.value.backToTop
-            ? window.innerHeight - bounds.value.backToTop.top + 12
-            : 0;
         const verticalInset = Math.max(
           16,
-          stackedAboveBackToTop || window.innerHeight - bounds.value.bottom + 16,
+          bounds.value.backToTop
+            ? window.innerHeight - bounds.value.backToTop.bottom
+            : window.innerHeight - bounds.value.bottom + 16,
         );
+        const stackOffset =
+          state.settings.avoidBackToTop && bounds.value.backToTop
+            ? -(bounds.value.backToTop.height + 12)
+            : 0;
         return {
           right: `${horizontalInset}px`,
           bottom: `${verticalInset}px`,
+          "--echo-scroll-assistant-stack-y": `${stackOffset}px`,
         };
       });
 
@@ -320,7 +371,9 @@ const createFloatingButton = (ctx) => {
         unwatchContainers = ctx.scroll.observeContainers(() => {
           window.setTimeout(bindContainer, 80);
         });
-        backToTopObserver = new MutationObserver(scheduleUpdate);
+        backToTopObserver = new MutationObserver((mutations) => {
+          if (mutations.some(shouldHandleBackToTopMutation)) scheduleUpdate();
+        });
         backToTopObserver.observe(document.body, {
           childList: true,
           subtree: true,
