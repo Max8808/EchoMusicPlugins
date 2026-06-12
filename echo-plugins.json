@@ -3,6 +3,17 @@
   "homepage": "https://github.com/hoowhoami/EchoMusicPlugins",
   "plugins": [
     {
+      "id": "water-lyrics",
+      "path": "water-lyrics",
+      "homepage": "https://github.com/hoowhoami/EchoMusicPlugins/tree/main/water-lyrics",
+      "tags": [
+        "appearance",
+        "lyrics",
+        "lyric-effects",
+        "animation"
+      ]
+    },
+    {
       "id": "page-motion",
       "path": "page-motion",
       "homepage": "https://github.com/hoowhoami/EchoMusicPlugins/tree/main/page-motion",
@@ -91,5 +102,4 @@
     }
   ]
 }
-
 
