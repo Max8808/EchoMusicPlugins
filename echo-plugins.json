@@ -24,6 +24,16 @@
       ]
     },
     {
+      "id": "scroll-assistant",
+      "path": "scroll-assistant",
+      "homepage": "https://github.com/hoowhoami/EchoMusicPlugins/tree/main/scroll-assistant",
+      "tags": [
+        "navigation",
+        "scroll",
+        "productivity"
+      ]
+    },
+    {
       "id": "cover-fallback",
       "path": "cover-fallback",
       "homepage": "https://github.com/hoowhoami/EchoMusicPlugins/tree/main/cover-fallback",
@@ -102,4 +112,3 @@
     }
   ]
 }
-
