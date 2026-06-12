@@ -27,8 +27,10 @@ const STYLE = `
     color 0.18s ease,
     border-color 0.18s ease,
     box-shadow 0.18s ease,
-    transform 0.18s ease,
-    opacity 0.18s ease;
+    transform 0.3s ease,
+    opacity 0.3s ease,
+    right 0.28s ease,
+    bottom 0.28s ease;
 }
 
 .echo-scroll-assistant-button:hover {
@@ -52,6 +54,19 @@ const STYLE = `
 .dark .echo-scroll-assistant-button {
   border-color: rgba(255, 255, 255, 0.26);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+}
+
+.echo-scroll-assistant-fade-enter-active,
+.echo-scroll-assistant-fade-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.echo-scroll-assistant-fade-enter-from,
+.echo-scroll-assistant-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 .echo-scroll-assistant-settings {
@@ -143,11 +158,22 @@ const saveSettings = () => {
   });
 };
 
-const isHostBackToTopVisible = () =>
-  Boolean(
-    document.querySelector(".back-to-top-btn") ||
-    document.querySelector(".settings-back-to-top.visible"),
+const isVisibleElement = (element) => {
+  if (!element) return false;
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const style = window.getComputedStyle(element);
+  return (
+    style.display !== "none" &&
+    style.visibility !== "hidden" &&
+    Number(style.opacity || 1) > 0.01
   );
+};
+
+const getHostBackToTopElement = () =>
+  [".back-to-top-btn", ".settings-back-to-top.visible"]
+    .map((selector) => document.querySelector(selector))
+    .find(isVisibleElement) || null;
 
 const isUsableContainer = (ctx, element) => {
   if (!element || !document.contains(element)) return false;
@@ -193,10 +219,12 @@ const createFloatingButton = (ctx) => {
       const bounds = ref({
         right: window.innerWidth,
         bottom: window.innerHeight,
+        backToTop: null,
       });
       let frame = 0;
       let unwatchRoute = null;
       let unwatchContainers = null;
+      let backToTopObserver = null;
 
       const updateMetrics = () => {
         const target = container.value;
@@ -215,9 +243,17 @@ const createFloatingButton = (ctx) => {
 
         metrics.value = ctx.scroll.getState(container.value);
         const rect = container.value.getBoundingClientRect();
+        const backToTopElement = getHostBackToTopElement();
+        const backToTopRect = backToTopElement?.getBoundingClientRect();
         bounds.value = {
           right: rect.right,
           bottom: rect.bottom,
+          backToTop: backToTopRect
+            ? {
+                top: backToTopRect.top,
+                right: backToTopRect.right,
+              }
+            : null,
         };
       };
 
@@ -248,13 +284,17 @@ const createFloatingButton = (ctx) => {
       const buttonStyle = computed(() => {
         const horizontalInset = Math.max(
           16,
-          window.innerWidth - bounds.value.right + 24,
+          bounds.value.backToTop
+            ? window.innerWidth - bounds.value.backToTop.right
+            : window.innerWidth - bounds.value.right + 24,
         );
-        const backToTopOffset =
-          state.settings.avoidBackToTop && isHostBackToTopVisible() ? 56 : 0;
+        const stackedAboveBackToTop =
+          state.settings.avoidBackToTop && bounds.value.backToTop
+            ? window.innerHeight - bounds.value.backToTop.top + 12
+            : 0;
         const verticalInset = Math.max(
           16,
-          window.innerHeight - bounds.value.bottom + 16 + backToTopOffset,
+          stackedAboveBackToTop || window.innerHeight - bounds.value.bottom + 16,
         );
         return {
           right: `${horizontalInset}px`,
@@ -275,6 +315,13 @@ const createFloatingButton = (ctx) => {
         unwatchContainers = ctx.scroll.observeContainers(() => {
           window.setTimeout(bindContainer, 80);
         });
+        backToTopObserver = new MutationObserver(scheduleUpdate);
+        backToTopObserver.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["class"],
+        });
       });
 
       onBeforeUnmount(() => {
@@ -283,30 +330,40 @@ const createFloatingButton = (ctx) => {
         window.removeEventListener("resize", scheduleUpdate);
         unwatchRoute?.();
         unwatchContainers?.();
+        backToTopObserver?.disconnect();
       });
 
       return () =>
-        visible.value
-          ? h(
-              "button",
-              {
-                type: "button",
-                class: "echo-scroll-assistant-button",
-                style: buttonStyle.value,
-                title: "到底部",
-                "aria-label": "到底部",
-                onClick: scrollToBottom,
-              },
-              [
-                h(Icon, {
-                  class: "echo-scroll-assistant-button-icon",
-                  icon: ctx.icons.iconArrowBarToDown || ctx.icons.iconSortDown,
-                  width: 20,
-                  height: 20,
-                }),
-              ],
-            )
-          : null;
+        h(
+          ctx.vue.Transition,
+          { name: "echo-scroll-assistant-fade" },
+          {
+            default: () =>
+              visible.value
+                ? h(
+                    "button",
+                    {
+                      type: "button",
+                      class: "echo-scroll-assistant-button",
+                      style: buttonStyle.value,
+                      title: "到底部",
+                      "aria-label": "到底部",
+                      onClick: scrollToBottom,
+                    },
+                    [
+                      h(Icon, {
+                        class: "echo-scroll-assistant-button-icon",
+                        icon:
+                          ctx.icons.iconArrowBarToDown ||
+                          ctx.icons.iconSortDown,
+                        width: 20,
+                        height: 20,
+                      }),
+                    ],
+                  )
+                : null,
+          },
+        );
     },
   });
 };
