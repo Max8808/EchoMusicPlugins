@@ -1468,17 +1468,17 @@ const createBrowserPage = (ctx, state) => {
           // === SliverHeader 风格头部（展开状态） ===
           h("div", { class: "flex items-start gap-5 px-6 flex-shrink-0", style: "background: var(--color-bg-main); padding-top: 10px;" }, [
             // 左侧大图标 (150x150)
-            h("div", { class: "w-[150px] h-[150px] rounded-[16px] flex items-center justify-center flex-shrink-0 overflow-hidden", style: "background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 70%, #000));" }, [
-              h(Icon, { icon: "tabler:server", width: 150, height: 150, style: "color: white; stroke: white;" }),
+            h("div", { class: "flex items-center justify-center flex-shrink-0 overflow-hidden", style: "width: 150px; height: 150px; background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 50%, white)); border-radius: 21px;" }, [
+              h(Icon, { icon: "tabler:server", width: 80, height: 80, color: "white" }),
             ]),
-            // 右侧信息列
-            h("div", { class: "flex-1 min-w-0 flex flex-col" }, [
+            // 右侧信息列（与封面等高，flex-1 可正确撑开）
+            h("div", { class: "flex-1 min-w-0 flex flex-col", style: "height: 150px;" }, [
               // 标题行（顶部，shrink-0）
               h("div", { class: "flex items-center justify-between gap-3 shrink-0" }, [
                 h("h1", { class: "flex-1 min-w-0 text-[24px] font-bold text-text-main leading-tight truncate m-0" }, "WebDAV"),
                 h("div", { class: "shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-[1.2px] uppercase", style: "background: color-mix(in srgb, var(--color-primary) 8%, transparent); color: var(--color-primary); border: 0.5px solid color-mix(in srgb, var(--color-primary) 20%, transparent);" }, "WEBDAV"),
               ]),
-              // 详情区域（垂直居中，flex-1）
+              // 详情区域（flex-1 撑满中间，justify-center 垂直居中，8px 上下间距）
               h("div", { class: "flex-1 min-h-0 flex flex-col justify-center", style: "padding-top: 8px; padding-bottom: 8px;" }, [
                 h("div", { class: "flex flex-col gap-2" }, [
                   h("div", { class: "text-[13px] font-semibold text-text-secondary" }, "连接WebDAV 服务器，浏览和播放云端音乐文件"),
@@ -1489,27 +1489,28 @@ const createBrowserPage = (ctx, state) => {
                 ]),
               ]),
               // 操作按钮行（贴底，shrink-0）
-              h("div", { class: "shrink-0" }, [
-                h("div", { class: "flex flex-wrap gap-2" }, [
-                  h("button", {
-                    class: "inline-flex items-center gap-2 px-3 h-9 rounded-lg text-[12px] font-semibold transition-all active:scale-95 select-none bg-primary text-white border-none cursor-pointer",
-                    onClick: playAll,
-                  }, [
-                    h(Icon, { icon: ctx.icons.iconPlay, width: 16, height: 16 }),
-                    h("span", {}, "播放"),
-                  ]),
-                  h("button", {
-                    class: "inline-flex items-center gap-2 px-3 h-9 rounded-lg text-[12px] font-semibold transition-all active:scale-95 select-none border-none cursor-pointer",
-                    style: { background: "var(--bg-info-card)", color: "var(--color-text-main)" },
-                    onClick: () => ctx.toast.info("批量操作功能开发中"),
-                  }, [
-                    h(Icon, { icon: ctx.icons.iconList, width: 16, height: 16 }),
-                    h("span", {}, "批量"),
-                  ]),
+              h("div", { class: "shrink-0 flex flex-wrap gap-2" }, [
+                h("button", {
+                  class: "inline-flex items-center gap-2 px-3 h-9 rounded-lg text-[12px] font-semibold transition-all active:scale-95 select-none bg-primary text-white border-none cursor-pointer",
+                  onClick: playAll,
+                }, [
+                  h(Icon, { icon: ctx.icons.iconPlay, width: 16, height: 16 }),
+                  h("span", {}, "播放"),
+                ]),
+                h("button", {
+                  class: "inline-flex items-center gap-2 px-3 h-9 rounded-lg text-[12px] font-semibold transition-all active:scale-95 select-none border-none cursor-pointer",
+                  style: { background: "var(--bg-info-card)", color: "var(--color-text-main)" },
+                  onClick: () => ctx.toast.info("批量操作功能开发中"),
+                }, [
+                  h(Icon, { icon: ctx.icons.iconList, width: 16, height: 16 }),
+                  h("span", {}, "批量"),
                 ]),
               ]),
             ]),
           ]),
+
+          // === 间距（仿主应用 SliverHeader expandedHeight 中图标底部16px剩余空间） ===
+          h("div", { style: "height: 16px;" }),
 
           // === 库标签栏（仿主应用 Tabs 吸顶效果） ===
           h("div", { class: "sticky z-110", style: "background: var(--color-bg-main);" }, [
