@@ -160,7 +160,7 @@ pnpm exec electron . --safe-mode
 
 `capabilities.audioSpectrum` 可选。插件如需通过 `ctx.audio.spectrum` 读取或订阅音频频谱数据，必须显式设为 `true`。该能力会启动系统音频捕获订阅，请只在可视化或音频分析插件中声明。
 
-`capabilities.localFiles` 可选。插件如需通过 `ctx.fs.listFiles()` 扫描本地音乐目录，或通过 `ctx.fs.readTextFile()` / `ctx.fs.readFileBytes()` 读取用户本地文件内容，必须显式设为 `true`。适合本地播放、本地媒体库、CUE/M3U/LRC 解析等插件。播放音频文件本身应使用 `ctx.fs.getFileUrl()` 转成 URL 后交给播放器，不要通过 IPC 读取整首音频。
+`capabilities.localFiles` 可选。插件如需通过 `ctx.fs.listFiles()` 扫描本地音乐目录，通过 `ctx.fs.readTextFile()` / `ctx.fs.readFileBytes()` 读取用户本地文件内容，或通过 `ctx.fs.writeFile()` 写入插件目录内文件，必须显式设为 `true`。适合本地播放、本地媒体库、CUE/M3U/LRC 解析、插件生成缓存图片或图标等场景。播放音频文件本身应使用 `ctx.fs.getFileUrl()` 转成 URL 后交给播放器，不要通过 IPC 读取整首音频。
 
 `capabilities.lyricEffects` 可选。插件如需通过 `ctx.lyricEffects.register()` 调整页面歌词排版、动效或挂载歌词装饰层，必须显式设为 `true`。适合水波歌词、KTV 字幕模板、当前行辉光、歌词背景水印等视觉插件。该能力只影响页面歌词显示，不提供歌词内容解析；提供歌词内容请使用 `capabilities.lyrics`。
 
@@ -294,6 +294,8 @@ export default {
 | `ctx.fs.getFileUrl(filePath)`                                         | 将用户选择的本地文件路径转换为可播放或可渲染的 `file://` URL                                                                                                                                                                                                                                                                                                                                                  |
 | `ctx.fs.readTextFile(filePath, options?)`                             | 读取本地文本文件片段，默认最多 1 MB，最大 4 MB，要求 manifest 声明 `capabilities.localFiles: true`                                                                                                                                                                                                                                                                                                            |
 | `ctx.fs.readFileBytes(filePath, options?)`                            | 读取本地文件字节片段，适合解析音频头部或标签，默认最多 1 MB，最大 4 MB，要求 manifest 声明 `capabilities.localFiles: true`                                                                                                                                                                                                                                                                                    |
+| `ctx.fs.writeFile(filePath, data, options?)`                          | 写入插件目录内文件，支持字符串、`ArrayBuffer`、`Uint8Array` 和 `{ type: "base64", data }`，默认不覆盖已有文件，最大 8 MB，要求 manifest 声明 `capabilities.localFiles: true`                                                                                                                                                                                                                                  |
+| `ctx.appIcons.refresh()`                                              | 重新读取插件存储中的应用图标配置并尝试刷新托盘、任务栏/窗口和桌面快捷方式图标                                                                                                                                                                                                                                                                                                                                  |
 | `ctx.process.launch(options)`                                         | 启动插件目录内的本地辅助程序，要求 manifest 声明 `capabilities.process: true`                                                                                                                                                                                                                                                                                                                                 |
 | `ctx.process.terminate(pid)`                                          | 终止当前插件通过 `ctx.process.launch()` 启动的进程                                                                                                                                                                                                                                                                                                                                                            |
 | `ctx.theme.surface.set(options)`                                      | 请求宿主调整主界面表面透明度和模糊效果，适合背景图、沉浸皮肤等插件                                                                                                                                                                                                                                                                                                                                            |
@@ -793,6 +795,35 @@ if (result.ok) {
 
 `ctx.fs.readTextFile(filePath, options?)` 适合读取 `.lrc`、`.cue`、`.m3u` 等文本片段；`ctx.fs.readFileBytes(filePath, options?)` 适合读取音频头部做标签解析。两者默认最多读取 1 MB，最大 4 MB；播放整首音频请使用 `getFileUrl()`，不要通过 IPC 读取完整音频文件。
 
+`ctx.fs.writeFile(filePath, data, options?)` 只允许写入当前插件目录内的文件，目标路径可以是相对插件目录的路径，也可以是插件目录内的绝对路径。默认自动创建父目录，默认不覆盖已有文件；如需覆盖，显式传入 `overwrite: true`。单次写入最大 8 MB，适合保存插件生成的缓存、图片、图标或配置导出文件。
+
+```js
+const picked = await ctx.dialog.selectFiles({
+  title: "选择应用图标",
+  filters: [{ name: "Images", extensions: ["png", "ico", "icns", "jpg", "webp"] }],
+});
+const sourcePath = picked.paths[0];
+const source = sourcePath
+  ? await ctx.fs.readFileBytes(sourcePath, { maxBytes: 4 * 1024 * 1024 })
+  : null;
+const ext = sourcePath?.split(".").pop() || "png";
+
+const result = source?.ok
+  ? await ctx.fs.writeFile(`generated/app-icon.${ext}`, source.data, {
+      overwrite: true,
+    })
+  : { ok: false };
+
+if (result.ok) {
+  await ctx.storage.set("appIcons", {
+    trayIconPath: result.path,
+    taskbarIconPath: result.path,
+    desktopIconPath: result.path,
+  });
+  await ctx.appIcons.refresh();
+}
+```
+
 设置值和跨窗口消息都应使用可克隆的普通数据。不要把 Vue `reactive` / `ref`、DOM 节点、函数、`File`、`Error` 等对象写入 `ctx.storage`、IPC 或 `BroadcastChannel`。如果插件开启了 `runtime.miniPlayer` / `runtime.desktopLyric` 并需要同步设置，建议先归一化并展开成普通对象：
 
 ```js
@@ -834,6 +865,59 @@ export async function activate(ctx) {
 ```
 
 封面兜底是全局行为，建议只由一个插件负责。若多个插件同时注册兜底，后注册的插件会成为当前兜底。
+
+## 应用图标替换
+
+插件可以通过私有存储声明自定义应用图标，由 EchoMusic 主进程在启动或刷新时读取并应用。图标文件可以是插件目录内相对路径、插件目录内绝对路径或 `file://` 地址，支持 `.png`、`.ico`、`.icns`、`.jpg`、`.webp`、`.bmp`。建议先用 `ctx.fs.writeFile()` 将生成或用户选择的图标保存到插件目录，再写入 `ctx.storage`。
+
+```js
+await ctx.storage.set("appIcons", {
+  trayIconPath: "generated/tray.png",
+  taskbarIconPath: "generated/taskbar.ico",
+  desktopIconPath: "generated/desktop.ico",
+});
+
+const result = await ctx.appIcons.refresh();
+if (!result.desktopApplied && result.desktopError) {
+  ctx.toast.warning(result.desktopError);
+}
+```
+
+也可以按平台分别提供路径：
+
+```js
+await ctx.storage.set("appIcons", {
+  win32: {
+    trayIconPath: "icons/tray.ico",
+    taskbarIconPath: "icons/taskbar.ico",
+    desktopIconPath: "icons/desktop.ico",
+  },
+  linux: {
+    trayIconPath: "icons/tray.png",
+    taskbarIconPath: "icons/taskbar.png",
+    desktopIconPath: "icons/desktop.png",
+  },
+  darwin: {
+    trayIconPath: "icons/trayTemplate.png",
+    taskbarIconPath: "icons/dock.icns",
+  },
+});
+await ctx.appIcons.refresh();
+```
+
+支持的存储 key：
+
+- `appIcons` / `appIcon` / `customAppIcons` / `customAppIcon`：推荐写对象，可包含 `trayIconPath`、`taskbarIconPath`、`desktopIconPath`，也可包含 `win32`、`linux`、`darwin` 平台分支。
+- `trayIconPath`、`trayIcon`、`trayPath`：单独配置托盘图标。
+- `taskbarIconPath`、`windowIconPath`、`dockIconPath`、`appIconPath`：单独配置运行中窗口、任务栏或 Dock 图标。
+- `desktopIconPath`、`desktopShortcutIconPath`、`shortcutIconPath`：单独配置桌面快捷方式图标。
+
+平台说明：
+
+- 托盘图标：运行时刷新。
+- 任务栏图标：运行中的窗口使用 `BrowserWindow.setIcon` 刷新；Windows 会额外尝试更新已存在的任务栏固定快捷方式 `.lnk`。
+- 桌面图标：Windows 更新已存在的桌面 `.lnk`；Linux 尝试更新桌面上的 EchoMusic `.desktop` 文件；macOS 不运行时写 App Bundle 图标，只支持 Dock/窗口运行时图标。
+- EchoMusic 不允许插件写入 `resources/icons/` 或应用安装目录。图标文件应保存在插件目录或用户选择的安全位置。
 
 ## 主题表面接入
 
