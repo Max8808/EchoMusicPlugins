@@ -134,6 +134,20 @@
         "liquidglass",
         "theme"
       ]
+    },
+      {
+      "id": "taskbar-lyric",
+      "name": "任务栏歌词",
+      "description": "在任务栏上方显示当前歌词和专辑封面的透明浮窗,自动检测任务栏位置并贴靠",
+      "author": "yaoyaoprincess",
+      "path": "",
+      "repo": "https://github.com/yaoyaoprincess/taskbar-lyric",
+      "homepage": "https://github.com/yaoyaoprincess/taskbar-lyric",
+      "tags": [
+        "floating-window",
+        "lyrics",
+        "lyric-effects"
+      ]
     }
   ]
 }
