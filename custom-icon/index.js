@@ -7,8 +7,6 @@ const AUDIO_FILTERS = [{ name: "Audio", extensions: ["mp3", "wav", "ogg", "m4a",
 const ICON_TYPES = ["tray", "taskbar", "desktop"];
 const SHORTCUT_TYPES = new Set(["taskbar", "desktop"]);
 
-const CONFIG_STORAGE_KEYS = ["appIcons"];
-
 const DEFAULT_SETTINGS = (() => {
   const base = { enabled: true, splashEnabled: true, splashImagePath: "", splashRelativePath: "", splashPreviewUrl: "", splashDuration: 3, splashScale: "cover", splashOverlayOpacity: 0.5, splashOverlayColor: "#ffffff", splashBlurAmount: 0, splashBgColor: "#ffffff", splashShowLogo: true, splashAudioEnabled: true, splashAudioPath: "", splashAudioRelativePath: "", splashAudioPreviewUrl: "", splashAudioVolume: 0.5, splashAudioDuration: 3 };
   for (const type of ICON_TYPES) {
@@ -64,6 +62,38 @@ const SETTINGS_PANEL_CSS = `
 let state = null;
 let settingsDispose = null;
 let settingsStyleDispose = null;
+
+const buildSettingsFromDraft = (draft, overrides = {}) => ({
+  ...DEFAULT_SETTINGS,
+  enabled: draft.enabled,
+  splashEnabled: draft.splashEnabled,
+  trayIconPath: draft.trayIconPath,
+  trayRelativePath: draft.trayRelativePath,
+  trayPreviewUrl: draft.trayPreviewUrl,
+  taskbarIconPath: draft.taskbarIconPath,
+  taskbarRelativePath: draft.taskbarRelativePath,
+  taskbarPreviewUrl: draft.taskbarPreviewUrl,
+  desktopIconPath: draft.desktopIconPath,
+  desktopRelativePath: draft.desktopRelativePath,
+  desktopPreviewUrl: draft.desktopPreviewUrl,
+  splashImagePath: draft.splashImagePath,
+  splashRelativePath: draft.splashRelativePath,
+  splashPreviewUrl: draft.splashPreviewUrl,
+  splashDuration: draft.splashDuration,
+  splashScale: draft.splashScale,
+  splashOverlayOpacity: draft.splashOverlayOpacity,
+  splashOverlayColor: draft.splashOverlayColor,
+  splashBlurAmount: draft.splashBlurAmount,
+  splashBgColor: draft.splashBgColor,
+  splashShowLogo: draft.splashShowLogo,
+  splashAudioEnabled: draft.splashAudioEnabled,
+  splashAudioPath: draft.splashAudioPath,
+  splashAudioRelativePath: draft.splashAudioRelativePath,
+  splashAudioPreviewUrl: draft.splashAudioPreviewUrl,
+  splashAudioVolume: draft.splashAudioVolume,
+  splashAudioDuration: draft.splashAudioDuration,
+  ...overrides,
+});
 
 const getExt = (name) => {
   const parts = String(name || "").split(".");
@@ -493,7 +523,12 @@ const createSettingsComponent = (ctx) =>
         try {
           const oldTray = state?.settings?.trayIconPath || "";
           for (const key of ICON_TYPES) { const p = draft[`${key}RelativePath`] || ""; if (p) await deleteFile(ctx, p); }
-          const s = { ...DEFAULT_SETTINGS, enabled: true, splashEnabled: draft.splashEnabled, splashImagePath: draft.splashImagePath, splashRelativePath: draft.splashRelativePath, splashPreviewUrl: draft.splashPreviewUrl, splashDuration: draft.splashDuration, splashScale: draft.splashScale, splashOverlayOpacity: draft.splashOverlayOpacity, splashOverlayColor: draft.splashOverlayColor, splashBlurAmount: draft.splashBlurAmount, splashBgColor: draft.splashBgColor, splashShowLogo: draft.splashShowLogo, splashAudioEnabled: draft.splashAudioEnabled, splashAudioPath: draft.splashAudioPath, splashAudioRelativePath: draft.splashAudioRelativePath, splashAudioPreviewUrl: draft.splashAudioPreviewUrl, splashAudioVolume: draft.splashAudioVolume, splashAudioDuration: draft.splashAudioDuration };
+          const s = buildSettingsFromDraft(draft, {
+            enabled: true,
+            trayIconPath: "", trayRelativePath: "", trayPreviewUrl: "",
+            taskbarIconPath: "", taskbarRelativePath: "", taskbarPreviewUrl: "",
+            desktopIconPath: "", desktopRelativePath: "", desktopPreviewUrl: "",
+          });
           Object.assign(draft, s);
           await ctx.storage.set(SETTINGS_KEY, s);
           if (state) state.settings = s;
@@ -537,7 +572,9 @@ const createSettingsComponent = (ctx) =>
         saving.value = true; message.value = ""; statusText.value = ""; statusType.value = "";
         try {
           const p = draft.splashRelativePath || "";
-          const s = { ...DEFAULT_SETTINGS, enabled: draft.enabled, splashEnabled: draft.splashEnabled, trayIconPath: draft.trayIconPath, trayRelativePath: draft.trayRelativePath, trayPreviewUrl: draft.trayPreviewUrl, taskbarIconPath: draft.taskbarIconPath, taskbarRelativePath: draft.taskbarRelativePath, taskbarPreviewUrl: draft.taskbarPreviewUrl, desktopIconPath: draft.desktopIconPath, desktopRelativePath: draft.desktopRelativePath, desktopPreviewUrl: draft.desktopPreviewUrl, splashAudioEnabled: draft.splashAudioEnabled, splashAudioPath: draft.splashAudioPath, splashAudioRelativePath: draft.splashAudioRelativePath, splashAudioPreviewUrl: draft.splashAudioPreviewUrl, splashAudioVolume: draft.splashAudioVolume, splashAudioDuration: draft.splashAudioDuration };
+          const s = buildSettingsFromDraft(draft, {
+            splashImagePath: "", splashRelativePath: "", splashPreviewUrl: "",
+          });
           Object.assign(draft, s);
           await ctx.storage.set(SETTINGS_KEY, s);
           if (state) state.settings = s;
@@ -613,7 +650,9 @@ const createSettingsComponent = (ctx) =>
         stopPreviewAudio();
         try {
           const p = draft.splashAudioRelativePath || "";
-          const s = { ...DEFAULT_SETTINGS, enabled: draft.enabled, splashEnabled: draft.splashEnabled, trayIconPath: draft.trayIconPath, trayRelativePath: draft.trayRelativePath, trayPreviewUrl: draft.trayPreviewUrl, taskbarIconPath: draft.taskbarIconPath, taskbarRelativePath: draft.taskbarRelativePath, taskbarPreviewUrl: draft.taskbarPreviewUrl, desktopIconPath: draft.desktopIconPath, desktopRelativePath: draft.desktopRelativePath, desktopPreviewUrl: draft.desktopPreviewUrl, splashImagePath: draft.splashImagePath, splashRelativePath: draft.splashRelativePath, splashPreviewUrl: draft.splashPreviewUrl, splashDuration: draft.splashDuration, splashScale: draft.splashScale, splashOverlayOpacity: draft.splashOverlayOpacity, splashOverlayColor: draft.splashOverlayColor, splashBlurAmount: draft.splashBlurAmount, splashBgColor: draft.splashBgColor, splashShowLogo: draft.splashShowLogo };
+          const s = buildSettingsFromDraft(draft, {
+            splashAudioPath: "", splashAudioRelativePath: "", splashAudioPreviewUrl: "",
+          });
           Object.assign(draft, s);
           await ctx.storage.set(SETTINGS_KEY, s);
           if (state) state.settings = s;
