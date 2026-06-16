@@ -308,6 +308,8 @@ export default {
 | `ctx.theme.surface.clear()`                                           | 清理当前插件提交的表面效果                                                                                                                                                                                                                                                                                                                                                                                    |
 | `ctx.theme.pageTransition.set(options)`                               | 请求宿主调整页面切换动效，适合页面动效和无障碍偏好插件                                                                                                                                                                                                                                                                                                                                                        |
 | `ctx.theme.pageTransition.clear()`                                    | 清理当前插件提交的页面动效设置                                                                                                                                                                                                                                                                                                                                                                                |
+| `ctx.theme.accentGradient.set(options)`                               | 请求宿主调整顶部主题色渐变氛围层（横跨侧栏与内容顶部的色带），支持颜色、角度、高度、透明度与暗色独立覆盖 |
+| `ctx.theme.accentGradient.clear()`                                    | 清理当前插件提交的顶部渐变配置 |
 | `ctx.nowPlaying`                                                      | 当前播放/歌词/外观快照 API，可读取快照、订阅变化、发送播放与歌词命令                                                                                                                                                                                                                                                                                                                                          |
 | `ctx.scroll`                                                          | 页面滚动容器 API：`queryContainers()`、`getCurrentContainer()`、`getState(el)`、`scrollToTop(el?)`、`scrollToBottom(el?)`、`observeContainers(handler)`；用于滚动增强插件，避免依赖宿主内部 DOM 类名                                                                                                                                                                                                            |
 | `ctx.windows`                                                         | 控制当前插件在 manifest 中声明的独立窗口：`show()`、`hide()`、`close()`、`move()`、`getBounds()`、`setIgnoreMouseEvents()` 等；`show()` 可临时覆盖 `alwaysOnTop` 和 `allowOutsideWorkArea`                                                                                                                                                                                                                     |
@@ -1321,6 +1323,48 @@ export function activate(ctx) {
 ```
 
 多个插件同时提交页面动效时，后提交的插件优先生效。
+
+## 顶部渐变接入
+
+主窗口顶部有一条横跨侧栏与内容区的「主题色渐变氛围层」。插件可以用 `ctx.theme.accentGradient.set(...)` 调整它的颜色、角度、高度和透明度，宿主会在插件禁用时自动恢复默认渐变。调用前建议先做能力探测：`if (ctx.theme?.accentGradient?.set) { ... }`。
+
+```js
+export function activate(ctx) {
+  if (!ctx.theme?.accentGradient?.set) {
+    ctx.toast.warning('当前 EchoMusic 版本不支持顶部渐变插件能力');
+    return;
+  }
+
+  const dispose = ctx.theme.accentGradient.set({
+    color: '#ff5c8a',
+    angle: 180,
+    height: '46%',
+    peakOpacity: 0.28,
+    midOpacity: 0.1,
+    midPosition: 60,
+    dark: {
+      peakOpacity: 0.4,
+      midOpacity: 0.16,
+    },
+  });
+
+  ctx.dispose(dispose);
+}
+```
+
+字段说明：
+
+- `enabled`：为 `false` 时隐藏整条渐变（等效 `opacity: 0`）。
+- `opacity`：整层不透明度倍率，支持 `0-1` 小数、`0-100` 数字或百分比字符串。
+- `color`：渐变基础颜色，支持十六进制（`#ff5c8a`）或 `'r,g,b'` 字符串；不传则跟随宿主主题色。
+- `angle`：渐变角度，数字按 `deg` 处理（`180` 等价 `'180deg'`），也接受 `turn/rad/grad`。
+- `height`：色带高度，数字按百分比处理（`46` → `'46%'`），也接受 `'240px'`、`'46%'`。
+- `midPosition`：中段色标位置，规则同 `height`，默认 `60%`。
+- `peakOpacity` / `midOpacity`：顶部与中段色标的透明度（rgba alpha），支持 `0-1` / `0-100` / 百分比。
+- `background`：完整 `background` 覆盖（逃生通道），设置后忽略上面的颜色/透明度字段，可用于多色或径向渐变。
+- `dark`：暗色模式专属覆盖，仅支持 `color`、`peakOpacity`、`midOpacity`、`background`；不提供时暗色沿用上面的基础配置（基础也未提供时用宿主默认）。
+
+`ctx.theme.accentGradient.set(...)` 返回提前清理函数，插件禁用时宿主也会自动清理。多个插件同时提交时，后提交的插件对同一字段优先生效。使用自定义壁纸（半透明表面）模式时，宿主会自动隐藏该渐变层。
 
 ## 页面歌词动效接入
 

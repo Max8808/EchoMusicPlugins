@@ -130,7 +130,7 @@ export function activateWindow(ctx) {
 
 快照包含：
 
-- `playback`：当前歌曲、封面、时长、进度、播放状态、我喜欢状态、倍速和快照更新时间。
+- `playback`：当前歌曲、封面、时长、进度、播放状态、我喜欢状态、私人 FM 状态（`isPersonalFM`，当前曲目是否来自私人 FM）、倍速和快照更新时间。
 - `lyric`：歌词行、当前行索引、翻译/音译开关、歌词偏移、加载状态。
 - `appearance`：深浅色、主题色、全局字体。
 
