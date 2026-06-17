@@ -1,6 +1,6 @@
 {
   "id": "example-plugin",
-  "name": "灵动岛歌词",
+  "name": "插件DEMO",
   "version": "1.0.1",
   "description": "EchoMusic 插件开发示例",
   "author": "EchoMusic",
@@ -14,7 +14,7 @@
       {
         "id": "island",
         "type": "floating",
-        "title": "灵动岛歌词",
+        "title": "灵动岛歌词DEMO",
         "main": "island.js",
         "style": "island.css",
         "defaultWidth": 260,
