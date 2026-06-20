@@ -716,7 +716,7 @@ const generateSongId = (path) => {
 
 /** 构建歌曲对象（统一 createSong 和 playFolder 中的重复逻辑） */
 const createSongObject = (entryName, filePath, opts = {}) => {
-  const { album = "WebDAV", coverUrl = "", libraryId = "" } = opts;
+  const { album = "WebDAV", coverUrl = _fallbackCoverUrlRef?.value || "", libraryId = "" } = opts;
   const { artist, title } = parseTitleArtist(entryName);
   const id = generateSongId(filePath);
   return {
@@ -1077,6 +1077,13 @@ const createBrowserPage = (ctx, state) => {
       const Button = defineAsyncComponent(ctx.ui.components.Button);
       const SliverHeader = defineAsyncComponent(ctx.ui.components.DetailPageSliverHeader);
       const PageScrollContainer = defineAsyncComponent(ctx.ui.components.PageScrollContainer);
+      const Drawer = defineAsyncComponent(ctx.ui.components.Drawer);
+      const Tabs = defineAsyncComponent(ctx.ui.components.Tabs);
+      const TabsList = defineAsyncComponent(ctx.ui.components.TabsList);
+      const TabsTrigger = defineAsyncComponent(ctx.ui.components.TabsTrigger);
+      const Scrollbar = defineAsyncComponent(ctx.ui.components.Scrollbar);
+      const ActionRow = defineAsyncComponent(ctx.ui.components.DetailPageActionRow);
+      const Badge = defineAsyncComponent(ctx.ui.components.Badge);
 
       // 当前激活的库
       const activeLibraryId = ref(state.settings.activeLibraryId || null);
@@ -1478,30 +1485,11 @@ const createBrowserPage = (ctx, state) => {
                 h("span", {}, searchQuery.value.trim() ? `${displayCount} / ${songCount} 首歌曲` : `${songCount} 首歌曲`),
               ]),
             ]),
-            actions: () => h("div", { class: "action-row-wrap flex flex-wrap gap-2" }, [
-              h(Button, {
-                variant: "unstyled",
-                size: "none",
-                onClick: playAll,
-                class: "action-btn primary",
-              }, {
-                default: () => [
-                  h(Icon, { icon: ctx.icons.iconPlay, width: 16, height: 16 }),
-                  h("span", {}, "播放"),
-                ],
-              }),
-              h(Button, {
-                variant: "unstyled",
-                size: "none",
-                onClick: openBatchDrawer,
-                class: "action-btn secondary",
-              }, {
-                default: () => [
-                  h(Icon, { icon: ctx.icons.iconList, width: 16, height: 16 }),
-                  h("span", {}, "批量"),
-                ],
-              }),
-            ]),
+            actions: () => h(ActionRow, {
+              playLabel: "播放",
+              onPlay: playAll,
+              onBatch: openBatchDrawer,
+            }),
             "collapsed-actions": () => h("div", { class: "flex items-center gap-1" }, [
               h(Button, {
                 variant: "unstyled",
@@ -1522,66 +1510,55 @@ const createBrowserPage = (ctx, state) => {
             ]),
           }),
 
-          // === 库标签栏（固定在 SliverHeader 下方） ===
-          h("div", { class: "sticky z-110", style: "top: 56px;" }, [
-            h("div", { class: "px-6 bg-bg-main" }, [
-              h("div", { class: "flex items-center justify-between h-14" }, [
-                h("div", { class: "flex items-center gap-8" },
-                  state.settings.libraries.map((library) => {
-                    const isActive = library.id === activeLibraryId.value;
-                    const displayName = library.name || "未命名库";
-                    const count = librarySongCounts.value[library.id] || 0;
-                    return h("button", {
-                      class: "relative h-full flex items-end pb-1 text-[15px] font-bold text-text-main bg-none border-none cursor-pointer whitespace-nowrap select-none",
-                      style: {
-                        opacity: isActive ? "1" : "0.6",
-                        transition: "opacity 0.2s",
-                      },
-                      onClick: () => switchLibrary(library.id),
-                    }, [
-                      h("span", { class: "relative" }, [
-                        h("span", {}, displayName),
-                        count >= 0
-                          ? h("span", {
-                              class: "absolute -top-1.5 -right-5 inline-flex min-w-[16px] h-4 items-center justify-center px-1 rounded-full text-[9px] font-bold tabular-nums shadow-sm select-none pointer-events-none",
-                              style: { background: "light-dark(#000, #fff)", color: "light-dark(#fff, #000)" },
-                            }, count)
-                          : null,
-                      ]),
-                      h("div", {
-                        class: ["absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 bg-primary rounded-full transition-all duration-300", isActive ? "w-6" : "w-0"],
+          // === 库标签栏 + 搜索/定位（使用主应用 Tabs 组件） ===
+          h("div", { class: "sticky z-110 bg-bg-main", style: "top: 56px;" }, [
+            h("div", { class: "flex items-center justify-between px-6 h-14 border-b border-[var(--border-subtle)]" }, [
+              state.settings.libraries.length > 1
+                ? h(Tabs, {
+                    modelValue: activeLibraryId.value,
+                    "onUpdate:modelValue": (v) => switchLibrary(v),
+                  }, {
+                    default: () => h(TabsList, { class: "bg-transparent border-none gap-8" },
+                      state.settings.libraries.map((library) => {
+                        return h(TabsTrigger, {
+                          value: library.id,
+                        }, [
+                          h("span", { class: "relative" }, [
+                            h("span", {}, library.name || "未命名库"),
+                            (librarySongCounts.value[library.id] || 0) > 0
+                              ? h(Badge, { count: librarySongCounts.value[library.id] })
+                              : null,
+                          ]),
+                        ]);
                       }),
-                    ]);
+                    ),
+                  })
+                : h("span", { class: "text-[15px] font-bold text-text-main" }, state.settings.libraries[0]?.name || "WebDAV"),
+              h("div", { class: "flex items-center gap-2 flex-shrink-0" }, [
+                h("div", { class: "relative" }, [
+                  h(Icon, { icon: ctx.icons.iconSearch, width: 14, height: 14, class: "absolute left-2.5 top-1/2 -translate-y-1/2", style: { color: "var(--color-text-main)", opacity: "0.6", pointerEvents: "none" } }),
+                  h("input", {
+                    class: "w-52 h-9 pl-8 pr-3 rounded-lg text-text-main placeholder:text-text-main/50 outline-none text-[12px] transition-all",
+                    style: { background: "var(--color-bg-elevated)" },
+                    type: "text",
+                    placeholder: "搜索歌曲...",
+                    value: searchQuery.value,
+                    onInput: (e) => { searchQuery.value = e.target.value; },
                   }),
-                ),
-                h("div", { class: "flex items-center gap-2 flex-shrink-0" }, [
-                  // 搜索框
-                  h("div", { class: "relative" }, [
-                    h(Icon, { icon: ctx.icons.iconSearch, width: 14, height: 14, class: "absolute left-2.5 top-1/2 -translate-y-1/2", style: { color: "var(--color-text-main)", opacity: "0.6", pointerEvents: "none" } }),
-                    h("input", {
-                      class: "w-52 h-9 pl-8 pr-3 rounded-lg text-text-main placeholder:text-text-main/50 outline-none text-[12px] transition-all",
-                      style: { background: "var(--color-bg-elevated)" },
-                      type: "text",
-                      placeholder: "搜索歌曲...",
-                      value: searchQuery.value,
-                      onInput: (e) => { searchQuery.value = e.target.value; },
-                    }),
-                  ]),
-                  // 定位按钮（仿主应用 song-locate-btn 样式）
-                  h(Button, {
-                    variant: "unstyled",
-                    size: "none",
-                    class: "song-locate-btn p-2 rounded-lg",
-                    title: "定位当前播放",
-                    onClick: scrollToActive,
-                  }, { default: () => h(Icon, { icon: ctx.icons.iconCurrentLocation, width: 18, height: 18 }) }),
                 ]),
+                h(Button, {
+                  variant: "unstyled",
+                  size: "none",
+                  class: "song-locate-btn p-2 rounded-lg",
+                  title: "定位当前播放",
+                  onClick: scrollToActive,
+                }, { default: () => h(Icon, { icon: ctx.icons.iconCurrentLocation, width: 18, height: 18 }) }),
               ]),
             ]),
           ]),
 
           // === 面包屑 + 导航按钮（固定在库标签栏下方） ===
-          h("div", { class: "sticky z-110 bg-bg-main flex items-center justify-between flex-shrink-0 px-6 py-1", style: "top: 112px; border-top: 1px solid var(--border-subtle);" }, [
+          h("div", { class: "sticky z-110 bg-bg-main flex items-center justify-between flex-shrink-0 px-6 py-1", style: "top: 112px;" }, [
             h("div", { class: "flex items-center flex-wrap gap-0.5" },
               breadcrumbs.value.map((crumb, index) => {
                 const items = [];
@@ -1650,6 +1627,7 @@ const createBrowserPage = (ctx, state) => {
                         }, [
                           h("div", { class: "webdav-row-inner" }, [
                           // 索引列 / 复选框列
+                          h("div", { class: "flex justify-center" }, [
                           h("div", { class: "relative w-4 h-4" }, [
                             showBatchDrawer.value && !isDir
                               ? h("div", {
@@ -1672,6 +1650,7 @@ const createBrowserPage = (ctx, state) => {
                                 ) : (
                                   h("div", { class: "absolute inset-0 flex items-center justify-center cursor-pointer text-text-main", onClick: (e) => { e.stopPropagation(); playFolder(filePath + "/"); }, title: "播放此文件夹" }, [h(Icon, { icon: ctx.icons.iconPlay, width: 14, height: 14 })])
                                 ),
+                          ]),
                           ]),
                           // 歌曲列（封面 + 信息）
                           h("div", { class: "webdav-col-song" }, [
@@ -1704,72 +1683,69 @@ const createBrowserPage = (ctx, state) => {
               ]),
             ]),
           ] : null,
-          // 批量操作抽屉（仿主应用 BatchActionDrawer）
-          showBatchDrawer.value ? h(Teleport, { to: "body" }, [
-            h("div", { class: "webdav-batch-overlay", onMousedown: closeBatchDrawer }),
-            h("div", { class: "webdav-batch-drawer" }, [
-              // 头部：标题 + 操作按钮 + 关闭
-              h("div", { class: "webdav-batch-header" }, [
-                h("div", { class: "webdav-batch-title" }, "批量操作"),
-                h("div", { class: "webdav-batch-actions" }, [
-                  h("button", {
-                    class: "webdav-batch-action",
-                    disabled: selectedSongs.value.length === 0,
-                    onClick: batchPlaySelected,
-                  }, [
+          // 批量操作抽屉（使用主应用 Drawer 组件）
+          h(Drawer, { open: showBatchDrawer.value, "onUpdate:open": (v) => { showBatchDrawer.value = v; }, side: "right", overlayClass: "batch-drawer-overlay", panelClass: "batch-drawer" }, {
+            default: () => h("div", { class: "flex flex-col h-full" }, [
+              // 头部
+              h("div", { class: "batch-header" }, [
+                h("div", { class: "batch-title" }, "批量操作"),
+                h("div", { class: "batch-actions" }, [
+                  h(Button, { variant: "secondary", size: "xs", disabled: selectedSongs.value.length === 0, onClick: batchPlaySelected, class: "batch-action" }, [
                     h(Icon, { icon: ctx.icons.iconPlay, width: 16, height: 16 }),
                     h("span", {}, "播放"),
                   ]),
-                  h("button", {
-                    class: "webdav-batch-action",
-                    disabled: selectedSongs.value.length === 0,
-                    onClick: batchAddToQueue,
-                  }, [
+                  h(Button, { variant: "secondary", size: "xs", disabled: selectedSongs.value.length === 0, onClick: batchAddToQueue, class: "batch-action" }, [
                     h(Icon, { icon: ctx.icons.iconPlus, width: 16, height: 16 }),
                     h("span", {}, "添加到"),
                   ]),
                 ]),
-                h("button", { class: "webdav-batch-close", onClick: closeBatchDrawer }, [
+                h(Button, { variant: "ghost", size: "xs", onClick: closeBatchDrawer, class: "batch-close", "aria-label": "关闭" }, [
                   h(Icon, { icon: "tabler:x", width: 14, height: 14 }),
                 ]),
               ]),
               // 全选 + 已选数量
-              h("div", { class: "webdav-batch-selection" }, [
-                h("button", { class: "webdav-batch-select-btn", onClick: toggleSelectAll }, [
-                  h("div", { class: ["webdav-checkbox", isAllSelected.value ? "is-checked" : "", isIndeterminate.value ? "is-indeterminate" : ""] }, [
-                    isAllSelected.value ? h("svg", { viewBox: "0 0 16 16", width: 10, height: 10, innerHTML: CHECK_SVG }) : null,
-                    isIndeterminate.value && !isAllSelected.value ? h("div", { class: "webdav-checkbox-indeterminate" }) : null,
+              h("div", { class: "batch-selection" }, [
+                h(Button, { variant: "ghost", size: "xs", onClick: toggleSelectAll, class: "batch-select" }, [
+                  h("span", { class: "batch-select-leading" }, [
+                    h("div", { class: ["webdav-checkbox", isAllSelected.value ? "is-checked" : "", isIndeterminate.value ? "is-indeterminate" : ""] }, [
+                      isAllSelected.value ? h("svg", { viewBox: "0 0 16 16", width: 10, height: 10, innerHTML: CHECK_SVG }) : null,
+                      isIndeterminate.value && !isAllSelected.value ? h("div", { class: "webdav-checkbox-indeterminate" }) : null,
+                    ]),
                   ]),
                   h("span", {}, "全选"),
                 ]),
-                h("div", { class: "webdav-batch-count" }, `已选 ${selectedKeys.value.size} / ${filteredEntries.value.filter((e) => !e.isCollection).length}`),
+                h("div", { class: "batch-count" }, `已选 ${selectedKeys.value.size} / ${filteredEntries.value.filter((e) => !e.isCollection).length}`),
               ]),
               // 歌曲列表
-              h("div", { class: "webdav-batch-list" }, [
-                filteredEntries.value.filter((e) => !e.isCollection).map((entry) => {
-                  const isSelected = selectedKeys.value.has(entry.name);
-                  const { artist, title } = parseTitleArtist(entry.name);
-                  return h("div", {
-                    class: ["webdav-batch-row", isSelected ? "is-selected" : ""],
-                    onClick: () => toggleSong(entry),
-                  }, [
-                    h("div", { class: "webdav-batch-leading" }, [
-                      h("div", { class: ["webdav-checkbox", isSelected ? "is-checked" : ""] }, [
-                        isSelected ? h("svg", { viewBox: "0 0 16 16", width: 10, height: 10, innerHTML: CHECK_SVG }) : null,
-                      ]),
-                    ]),
-                    h("div", { class: "webdav-batch-card" }, [
-                      h("div", { class: "webdav-batch-song-info" }, [
-                        h("span", { class: "webdav-batch-song-title" }, title || entry.name),
-                        h("span", { class: "webdav-batch-song-artist" }, artist || "未知歌手"),
-                      ]),
-                    ]),
-                    h("div", { class: "webdav-batch-size" }, formatSize(entry.contentLength)),
-                  ]);
+              h("div", { class: "batch-list" }, [
+                h(Scrollbar, { class: "flex-1 min-h-0" }, {
+                  default: () => h("div", { class: "batch-list-inner" }, [
+                    filteredEntries.value.filter((e) => !e.isCollection).map((entry) => {
+                      const isSelected = selectedKeys.value.has(entry.name);
+                      const { artist, title } = parseTitleArtist(entry.name);
+                      return h("div", {
+                        class: ["batch-row", isSelected ? "text-primary" : ""],
+                        onClick: () => toggleSong(entry),
+                      }, [
+                        h("div", { class: "batch-leading" }, [
+                          h("div", { class: ["webdav-checkbox", isSelected ? "is-checked" : ""] }, [
+                            isSelected ? h("svg", { viewBox: "0 0 16 16", width: 10, height: 10, innerHTML: CHECK_SVG }) : null,
+                          ]),
+                        ]),
+                        h("div", { class: "batch-card" }, [
+                          h("div", { class: "webdav-song-info" }, [
+                            h("span", { class: "webdav-song-title" }, title || entry.name),
+                            h("span", { class: "webdav-song-artist" }, artist || "未知歌手"),
+                          ]),
+                        ]),
+                        h("div", { class: "batch-album" }, formatSize(entry.contentLength)),
+                      ]);
+                    }),
+                  ]),
                 }),
               ]),
             ]),
-          ]) : null,
+          }),
         ]);
       };
     },
