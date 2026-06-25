@@ -473,9 +473,7 @@ const applyHiddenPlaylists = (ctx, pmSettings) => {
     const store = ctx.stores.playlist;
     const playlists = store?.userPlaylists || [];
     const hiddenSet = new Set(pmSettings.hiddenPlaylistIds);
-    const isLiked = (p) => (likedId ? getPlaylistIdentityList(p).includes(likedId) : false);
-    const isDefault = (p) => p.source !== 2 && p.type === 0 && p.isDefault === true;
-    const pinnedIds = playlists.filter((p) => isDefault(p) || isLiked(p)).map(getPlaylistId);
+    const pinnedIds = playlists.filter((p) => isPlaylistDefault(p) || isPlaylistLiked(p, likedId)).map(getPlaylistId);
     const allPinnedHidden = pinnedIds.length > 0 && pinnedIds.every((id) => hiddenSet.has(id));
     document.querySelectorAll(".sidebar-library-item, .sidebar-rail-cover-btn").forEach((el) => {
       const span = el.querySelector("span");
@@ -560,8 +558,9 @@ const MIME_MAP = {
   m4a: "audio/mp4", aac: "audio/mp4", flac: "audio/flac", wma: "audio/x-ms-wma",
 };
 
-const getMime = (ext) => MIME_MAP[String(ext || "").toLowerCase().replace(/^\./, "")] || "image/png";
-const getAudioMime = (ext) => MIME_MAP[String(ext || "").toLowerCase().replace(/^\./, "")] || "audio/mpeg";
+const getMime = (ext, fallback = "image/png") => MIME_MAP[String(ext || "").toLowerCase().replace(/^\./, "")] || fallback;
+
+const getMimeForFile = (ext, isAudio = false) => getMime(ext, isAudio ? "audio/mpeg" : "image/png");
 
 const bufferToDataUrl = (buf, mime) => {
   if (!buf) return "";
@@ -587,6 +586,10 @@ const getFileName = (p) => {
   const i = n.lastIndexOf("/");
   return i >= 0 ? n.substring(i + 1) : n;
 };
+
+const isPlaylistLiked = (p, likedId) => likedId ? getPlaylistIdentityList(p).includes(likedId) : false;
+const isPlaylistDefault = (p) => p.source !== 2 && p.type === 0 && p.isDefault === true;
+const resolveGifUrl = async (ctx, path, fallback) => isGifPath(path) ? (await resolveImageUrl(ctx, path)) || fallback : fallback;
 
 const normalizeSettings = (stored) => {
   const src = (stored && typeof stored === "object") || Array.isArray(stored) ? stored : {};
@@ -674,7 +677,7 @@ const playSplashAudio = async (ctx, settings) => {
     if (!url) {
       const result = await ctx.fs.readFileBytes(settings.splashAudioPath, { maxBytes: 4 * 1024 * 1024 });
       if (!result?.ok) return;
-      url = bufferToDataUrl(result.data, getAudioMime(ext));
+      url = bufferToDataUrl(result.data, getMimeForFile(ext, true));
     }
     if (!url) return;
     splashAudio = new Audio(url);
@@ -727,8 +730,7 @@ const resolveImageUrl = async (ctx, filePath) => {
 const applySplashCss = async (ctx, settings) => {
   removeSplashCss();
   if (!settings.splashEnabled || !settings.splashImagePath || !settings.splashPreviewUrl) return;
-  let url = settings.splashPreviewUrl;
-  if (isGifPath(settings.splashImagePath)) url = await resolveImageUrl(ctx, settings.splashImagePath) || url;
+  const url = await resolveGifUrl(ctx, settings.splashImagePath, settings.splashPreviewUrl);
   const sizeRule = settings.splashScale === "contain" ? "contain" : settings.splashScale === "fill" ? "100% 100%" : "cover";
   const blurRule = settings.splashBlurAmount > 0 ? `.custom-splash-img{filter:blur(${settings.splashBlurAmount}px)!important}` : "";
   const overlayRule = settings.splashOverlayOpacity > 0
@@ -752,8 +754,7 @@ const createSplashImg = (url, target) => {
 const showSplash = async (ctx, settings) => {
   removeSplash();
   if (!settings.splashImagePath || !settings.splashPreviewUrl) return;
-  let url = settings.splashPreviewUrl;
-  if (isGifPath(settings.splashImagePath)) url = await resolveImageUrl(ctx, settings.splashImagePath) || url;
+  const url = await resolveGifUrl(ctx, settings.splashImagePath, settings.splashPreviewUrl);
   const lv = getLoadingView();
   if (lv && !lv.querySelector(".custom-splash-img")) createSplashImg(url, lv);
   const overlay = document.createElement("div");
@@ -781,8 +782,7 @@ const createSplashObserver = (ctx) => {
   return ctx.dom.observe(".loading-view", async (element) => {
     const s = state?.settings;
     if (!s?.splashEnabled || !s?.splashImagePath || !s?.splashPreviewUrl || element.querySelector(".custom-splash-img")) return;
-    let url = s.splashPreviewUrl;
-    if (isGifPath(s.splashImagePath)) url = await resolveImageUrl(ctx, s.splashImagePath) || url;
+    const url = await resolveGifUrl(ctx, s.splashImagePath, s.splashPreviewUrl);
     createSplashImg(url, element);
     const main = element.querySelector("main");
     if (main) {
@@ -810,35 +810,22 @@ const deleteFile = async (ctx, relativePath) => {
   try { await ctx.fs.deleteFile(relativePath); } catch {}
 };
 
-const readIconFile = async (ctx, filePath, title, filters, maxBytes, folder) => {
+const readMediaFile = async (ctx, { key, title, filters, maxBytes, folder, defaultExt = "png", isAudio = false }) => {
+  const errorPrefix = isAudio ? "音效" : "图片";
+  const buttonLabel = isAudio ? "使用此音效" : "使用此图片";
   try {
-    const result = await ctx.dialog.selectFiles({ title, buttonLabel: "使用此图片", filters });
+    const result = await ctx.dialog.selectFiles({ title, buttonLabel, filters });
     const path = result?.paths?.[0] || "";
     if (result?.canceled || !path) return null;
     const source = await ctx.fs.readFileBytes(path, { maxBytes });
-    if (!source?.ok) { ctx.toast.warning(`无法读取选择的图片（超过 ${Math.round(maxBytes / 1024 / 1024)}MB 或文件不可访问）`); return null; }
-    const ext = getExt(path.split(/[\\/]/).pop() || "");
-    const destFolder = folder || (filePath === "splash" ? "assets/images" : "assets/icons");
+    if (!source?.ok) { ctx.toast.warning(`无法读取选择的${errorPrefix}（超过 ${Math.round(maxBytes / 1024 / 1024)}MB 或文件不可访问）`); return null; }
+    const ext = getExt(path.split(/[\\/]/).pop() || "") || defaultExt;
+    const destFolder = folder || (isAudio ? "assets/audio" : key === "splash" ? "assets/images" : "assets/icons");
     const destPath = `${destFolder}/${getFileName(path)}`;
     const writeResult = await ctx.fs.writeFile(destPath, source.data, { overwrite: true });
-    if (!writeResult?.ok) { ctx.toast.warning(`图片保存失败: ${writeResult?.error || "未知错误"}`); return null; }
-    return { relativePath: destPath, absolutePath: writeResult.path || "", previewUrl: bufferToDataUrl(source.data, getMime(ext)), ext: ext || "png" };
-  } catch (e) { ctx.toast.warning(e instanceof Error ? e.message : "图片选择失败"); return null; }
-};
-
-const readAudioFile = async (ctx, filePath, title, filters, maxBytes) => {
-  try {
-    const result = await ctx.dialog.selectFiles({ title, buttonLabel: "使用此音效", filters });
-    const path = result?.paths?.[0] || "";
-    if (result?.canceled || !path) return null;
-    const source = await ctx.fs.readFileBytes(path, { maxBytes });
-    if (!source?.ok) { ctx.toast.warning(`无法读取选择的音效（超过 ${Math.round(maxBytes / 1024 / 1024)}MB 或文件不可访问）`); return null; }
-    const ext = getExt(path.split(/[\\/]/).pop() || "");
-    const destPath = `assets/audio/${getFileName(path)}`;
-    const writeResult = await ctx.fs.writeFile(destPath, source.data, { overwrite: true });
-    if (!writeResult?.ok) { ctx.toast.warning(`音效保存失败: ${writeResult?.error || "未知错误"}`); return null; }
-    return { relativePath: destPath, absolutePath: writeResult.path || "", previewUrl: bufferToDataUrl(source.data, getAudioMime(ext)), ext: ext || "mp3" };
-  } catch (e) { ctx.toast.warning(e instanceof Error ? e.message : "音效选择失败"); return null; }
+    if (!writeResult?.ok) { ctx.toast.warning(`${errorPrefix}保存失败: ${writeResult?.error || "未知错误"}`); return null; }
+    return { relativePath: destPath, absolutePath: writeResult.path || "", previewUrl: bufferToDataUrl(source.data, getMimeForFile(ext, isAudio)), ext };
+  } catch (e) { ctx.toast.warning(e instanceof Error ? e.message : `${errorPrefix}选择失败`); return null; }
 };
 
 const saveIconStorage = async (ctx, settings) => {
@@ -963,7 +950,7 @@ const createSettingsComponent = (ctx) =>
 
       const handleSelectIcon = async (key) => {
         const oldPath = draft[`${key}RelativePath`] || "";
-        const r = await readIconFile(ctx, key, ICON_FILE_NAMES[key], SHORTCUT_TYPES.has(key) ? ICO_FILTERS : IMAGE_FILTERS, 2 * 1024 * 1024);
+        const r = await readMediaFile(ctx, { key, title: ICON_FILE_NAMES[key], filters: SHORTCUT_TYPES.has(key) ? ICO_FILTERS : IMAGE_FILTERS, maxBytes: 2 * 1024 * 1024 });
         if (r) {
           if (oldPath) await deleteFile(ctx, oldPath);
           setVal(`${key}IconPath`, r.absolutePath || r.relativePath);
@@ -983,7 +970,7 @@ const createSettingsComponent = (ctx) =>
 
       const handleSelectSplash = async () => {
         const oldPath = draft.splashRelativePath || "";
-        const r = await readIconFile(ctx, "splash", "选择启动画面图片", IMAGE_FILTERS, 10 * 1024 * 1024);
+        const r = await readMediaFile(ctx, { key: "splash", title: "选择启动画面图片", filters: IMAGE_FILTERS, maxBytes: 10 * 1024 * 1024 });
         if (r) {
           if (oldPath) await deleteFile(ctx, oldPath);
           setVal("splashImagePath", r.absolutePath || r.relativePath);
@@ -1108,7 +1095,7 @@ const createSettingsComponent = (ctx) =>
 
       const handleSelectAudio = async () => {
         const oldPath = draft.splashAudioRelativePath || "";
-        const r = await readAudioFile(ctx, "splash-audio", "选择启动音效", AUDIO_FILTERS, 10 * 1024 * 1024);
+        const r = await readMediaFile(ctx, { key: "splash-audio", title: "选择启动音效", filters: AUDIO_FILTERS, maxBytes: 10 * 1024 * 1024, isAudio: true });
         if (r) {
           if (oldPath) await deleteFile(ctx, oldPath);
           setVal("splashAudioPath", r.absolutePath || r.relativePath);
@@ -1132,7 +1119,7 @@ const createSettingsComponent = (ctx) =>
           let url = draft.splashAudioPreviewUrl;
           if (!url) {
             const result = await ctx.fs.readFileBytes(draft.splashAudioPath, { maxBytes: 4 * 1024 * 1024 });
-            if (result?.ok) url = bufferToDataUrl(result.data, getAudioMime(getExt(draft.splashAudioPath)));
+            if (result?.ok) url = bufferToDataUrl(result.data, getMimeForFile(getExt(draft.splashAudioPath), true));
           }
           if (!url) return;
           previewAudioPlayer = new Audio(url);
@@ -1414,11 +1401,9 @@ const createSettingsComponent = (ctx) =>
         const store = ctx.stores.playlist;
         const all = store?.userPlaylists || [];
         const likedId = String(store?.likedPlaylistQueryId ?? "");
-        const isLiked = (p) => likedId ? getPlaylistIdentityList(p).includes(likedId) : false;
-        const isDefault = (p) => p.source !== 2 && p.type === 0 && p.isDefault === true;
         const currentUserId = (() => {
           for (const p of all) {
-            if (isDefault(p) || isLiked(p)) {
+            if (isPlaylistDefault(p) || isPlaylistLiked(p, likedId)) {
               const uid = String(p.listCreateUserid ?? "");
               if (uid) return uid;
             }
@@ -1434,7 +1419,7 @@ const createSettingsComponent = (ctx) =>
         for (const p of all) {
           if (p.source === 2) continue;
           const item = { ...p, _id: getPlaylistId(p) };
-          (isOwner(p) || isDefault(p) || isLiked(p) ? created : favorited).push(item);
+          (isOwner(p) || isPlaylistDefault(p) || isPlaylistLiked(p, likedId) ? created : favorited).push(item);
         }
         playlists.value = created;
         favoritedPlaylists.value = favorited;
@@ -1449,7 +1434,7 @@ const createSettingsComponent = (ctx) =>
       };
 
       const handleSelectPlaylistCover = async (playlistId) => {
-        const r = await readIconFile(ctx, "cover", "选择歌单封面图片", IMAGE_FILTERS, 4 * 1024 * 1024, "assets/covers");
+        const r = await readMediaFile(ctx, { key: "cover", title: "选择歌单封面图片", filters: IMAGE_FILTERS, maxBytes: 4 * 1024 * 1024, folder: "assets/covers" });
         if (!r) return;
         const old = pmDraft.customCovers[playlistId];
         if (old?.relativePath) await deleteFile(ctx, old.relativePath);
