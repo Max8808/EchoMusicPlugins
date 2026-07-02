@@ -1,6 +1,6 @@
 // ===== 小功能 =====
 // Author: 张三
-// 小功能：热门排序 + 收藏歌单自动切换 + 单击播放 + 首页卡片一键播放(每日推荐/排行榜) + 歌词自动隐藏控制栏 + 隐藏听歌识曲 + 顶部插件按钮 + 10种桌面特效
+// 小功能：热门排序 + 收藏歌单自动切换 + 单击播放 + 首页卡片一键播放(每日推荐/排行榜) + 歌词界面完全沉浸 + 隐藏听歌识曲 + 顶部插件按钮 + 10种桌面特效
 // 注意：右键下载已独立为单独插件，如需使用请安装 right-click-download
 // 在插件设置面板中可独立开关每个功能
 
@@ -816,19 +816,23 @@ function stopDailyPlay() {
   if (_dailyDispose) { _dailyDispose(); _dailyDispose = null; }
 }
 
-// ================ 5. 歌词自动隐藏控制栏 ================
+// ================ 5. 歌词界面完全沉浸 ================
 
 var lhStyle = null;
-var lhTimer = null;
 var lhLoop = null;
+var lhTimer = null;
 var lhMoveTarget = null;
-var LH_IDLE_MS = 2000;
 
 function lhInjectCSS() {
   if (document.getElementById('zhs-lh-style')) return;
   var s = document.createElement('style');
   s.id = 'zhs-lh-style';
   s.textContent = [
+    // 7 个按钮永久隐藏
+    '.lyric-page-toolbar, .overlay-header {',
+    '  display: none !important;',
+    '}',
+    // 底部控制栏 2 秒无操作自动隐藏，鼠标移动恢复
     '.lyric-page-body .lyric-bar {',
     '  transition: visibility 0s 0.5s, opacity 0.5s ease !important;',
     '}',
@@ -851,7 +855,9 @@ function lhReset() {
   if (!body) return;
   body.classList.remove('idle');
   clearTimeout(lhTimer);
-  lhTimer = setTimeout(function() { body.classList.add('idle'); }, LH_IDLE_MS);
+  lhTimer = setTimeout(function() {
+    body.classList.add('idle');
+  }, 2000);
 }
 
 function lhOnMove() { lhReset(); }
@@ -887,7 +893,6 @@ function stopLyricHide() {
   lhRemoveCSS();
   lhCleanup();
 }
-
 // ================== 6. 隐藏顶部听歌识曲按钮 ==================
 
 var hrStyle = null;
@@ -962,7 +967,7 @@ export async function activate(_ctx) {
           { id: 'hidePlaylist', icon: '📋', label: '收藏歌单自动切换', desc: '启动时自动切换到收藏歌单', enabled: featureState.hidePlaylist },
           { id: 'clickToPlay', icon: '👆', label: '单击播放', desc: '单击歌曲任意位置即可播放', enabled: featureState.clickToPlay },
           { id: 'dailyPlay', icon: '🎵', label: '首页卡片一键播放', desc: '每日推荐/排行榜卡片上直接播放，不跳转', enabled: featureState.dailyPlay },
-          { id: 'lyricHide', icon: '🙈', label: '歌词隐藏控制栏', desc: '歌词全屏时控制栏2秒无操作自动隐藏', enabled: featureState.lyricHide },
+          { id: 'lyricHide', icon: '🙈', label: '歌词界面完全沉浸', desc: '歌词界面7个工具栏按钮永久隐藏，底部控制栏2秒无操作自动隐藏', enabled: featureState.lyricHide },
           { id: 'hideRecognize', icon: '🚫', label: '隐藏听歌识曲', desc: '隐藏顶部导航栏的听歌识曲按钮', enabled: featureState.hideRecognize },
           { id: 'pluginBtn', icon: '🔧', label: '顶部插件管理入口', desc: '搜索框右侧添加插件快捷按钮', enabled: featureState.pluginBtn },
           { id: 'effect', icon: '🎆', label: '桌面特效', desc: '10种粒子特效', enabled: featureState.effect },
